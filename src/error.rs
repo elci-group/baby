@@ -34,7 +34,10 @@ impl fmt::Display for ErrorKind {
         match self {
             ErrorKind::Io => write!(f, "I/O error; check the path and permissions and retry"),
             ErrorKind::CommandFailed => {
-                write!(f, "command failed; inspect the output and fix the reported issue")
+                write!(
+                    f,
+                    "command failed; inspect the output and fix the reported issue"
+                )
             }
             ErrorKind::ConfigParse => {
                 write!(f, "config parse error; check the file syntax and retry")
@@ -43,9 +46,14 @@ impl fmt::Display for ErrorKind {
                 f,
                 "project name inference error; run from a project directory or pass --project"
             ),
-            ErrorKind::HomeNotSet => write!(f, "HOME not set; set HOME or run with a valid user environment"),
+            ErrorKind::HomeNotSet => write!(
+                f,
+                "HOME not set; set HOME or run with a valid user environment"
+            ),
             ErrorKind::PidNotFound => write!(f, "PID file not found; start birthd with `birthd`"),
-            ErrorKind::ProcessNotAlive => write!(f, "process not alive; start birthd with `birthd`"),
+            ErrorKind::ProcessNotAlive => {
+                write!(f, "process not alive; start birthd with `birthd`")
+            }
             ErrorKind::Daemon => write!(f, "daemon error; check the logs and restart birthd"),
             ErrorKind::Watch => write!(f, "watch error; check the watch path and restart birthd"),
         }
