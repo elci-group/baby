@@ -1,0 +1,5 @@
+# Brandi rule overrides for baby.
+# Keep the project error-surface actionable: every user-facing error or warning
+# must tell the user what to do next.
+severity:
+  error-actionable: warning
