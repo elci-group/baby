@@ -243,11 +243,17 @@ fn process_pending(state: &Arc<Mutex<DaemonState>>) -> Result<()> {
                 .map_err(|e| BabyError::io(format!("run build command for {}", cfg.project), e))?;
 
             if !status.success() {
-                log::warn!("build failed for {}", cfg.project);
+                log::warn!(
+                    "build failed for {}; inspect the output above and fix the reported issue",
+                    cfg.project
+                );
                 continue;
             }
         } else if let Err(e) = build_and_install(&install_cfg) {
-            log::warn!("build failed for {}: {e}", cfg.project);
+            log::warn!(
+                "build failed for {}: {e}; inspect the output above and fix the reported issue",
+                cfg.project
+            );
             continue;
         }
 
