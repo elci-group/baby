@@ -1,7 +1,7 @@
-traits: [precise, ambitious, human]
+traits: [precise, reliable, human]
 trait_signals:
-  precise: [exactly, deterministic, verify]
-  ambitious: [build, push, frontier]
+  precise: [exactly, deterministic, verify, path, command]
+  reliable: [safe, graceful, retry, confirm, protect]
   human: [you, your, we]
 style:
   sentence_case_headings: true

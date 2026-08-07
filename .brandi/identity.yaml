@@ -1,10 +1,19 @@
 product:
-  name: Brandi
-  tagline: "Brand coherence intelligence"
-  mission: "Keep every outward expression of a product aligned with its identity."
-  aliases: []
+  name: baby
+  tagline: "Build And Bin Yield"
+  mission: "Make building and installing Rust binaries effortless, observable, and repeatable."
+  aliases: [BABY]
   former_names: []
-archetype: [explorer, engineer, challenger]
+archetype: [engineer, explorer, caregiver]
 terminology:
-  canonical: {}
-  banned_variants: {}
+  canonical:
+    build daemon: birthd
+    control utility: birthctl
+    local config file: .birth.toml
+    install command: baby
+    user install path: ~/.local/bin
+    system install path: /usr/local/bin
+  banned_variants:
+    BirthD: birthd
+    BirthCTL: birthctl
+    Birth.toml: .birth.toml
