@@ -69,7 +69,6 @@ fn is_leap_year(year: u32) -> bool {
 }
 
 fn secs_to_utc(mut secs: u64) -> (u32, u32, u32, u32, u32, u32) {
-    const SECS_PER_DAY: u64 = 86_400;
     let ss = secs % 60;
     secs /= 60;
     let mm = secs % 60;
