@@ -102,10 +102,11 @@ pub fn load_all_configs() -> Vec<(PathBuf, ProjectConfig)> {
 
     // Current directory .birth.toml
     let local = PathBuf::from(".birth.toml");
-    if local.exists()
-        && let Ok(cfg) = load_config_file(&local)
-    {
-        configs.push((local, cfg));
+    if local.exists() {
+        match load_config_file(&local) {
+            Ok(cfg) => configs.push((local, cfg)),
+            Err(e) => log::warn!("skipping {}: {e}", local.display()),
+        }
     }
 
     // XDG and system directories
@@ -114,10 +115,11 @@ pub fn load_all_configs() -> Vec<(PathBuf, ProjectConfig)> {
         if let Ok(entries) = fs::read_dir(&dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.extension().and_then(|s| s.to_str()) == Some("toml")
-                    && let Ok(cfg) = load_config_file(&path)
-                {
-                    configs.push((path, cfg));
+                if path.extension().and_then(|s| s.to_str()) == Some("toml") {
+                    match load_config_file(&path) {
+                        Ok(cfg) => configs.push((path, cfg)),
+                        Err(e) => log::warn!("skipping {}: {e}", path.display()),
+                    }
                 }
             }
         }
@@ -142,6 +144,7 @@ pub fn load_config_file(path: &Path) -> Result<ProjectConfig> {
     }
     cfg.watch = resolved;
 
+    cfg.validate()?;
     Ok(cfg)
 }
 
@@ -166,15 +169,21 @@ mod tests {
     fn parse_minimal_config() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("test.birth.toml");
-        let mut file = fs::File::create(&path).unwrap();
-        write!(file, r#"project = "demo""#).unwrap();
+        fs::write(
+            &path,
+            r#"
+project = "demo"
+watch = ["src"]
+"#,
+        )
+        .unwrap();
 
         let cfg = load_config_file(&path).unwrap();
         assert_eq!(cfg.project, "demo");
         assert_eq!(cfg.build, "cargo build --release");
         assert_eq!(cfg.install, PathBuf::from("/usr/local/bin"));
         assert_eq!(cfg.debounce_ms, 500);
-        assert!(cfg.watch.is_empty());
+        assert_eq!(cfg.watch, vec![dir.path().join("src").to_string_lossy().to_string()]);
     }
 
     #[test]
