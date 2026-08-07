@@ -27,8 +27,6 @@ pub enum ErrorKind {
     Daemon,
     /// Filesystem watching failed.
     Watch,
-    /// Man-page generation failed.
-    ManPage,
 }
 
 impl fmt::Display for ErrorKind {
@@ -43,7 +41,6 @@ impl fmt::Display for ErrorKind {
             ErrorKind::ProcessNotAlive => write!(f, "process not alive"),
             ErrorKind::Daemon => write!(f, "daemon error"),
             ErrorKind::Watch => write!(f, "watch error"),
-            ErrorKind::ManPage => write!(f, "man page error"),
         }
     }
 }
@@ -136,14 +133,6 @@ impl BabyError {
     pub fn watch(source: notify::Error) -> Self {
         Self {
             kind: ErrorKind::Watch,
-            message: source.to_string(),
-        }
-    }
-
-    /// Man-page generation error.
-    pub fn man_page(source: clap_mangen::Error) -> Self {
-        Self {
-            kind: ErrorKind::ManPage,
             message: source.to_string(),
         }
     }

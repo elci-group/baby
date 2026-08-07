@@ -1,3 +1,4 @@
+use baby::error::Result;
 use baby::{InstallConfig, build_and_install, run_binary, setup_logging};
 use clap::Parser;
 use std::path::PathBuf;
@@ -79,7 +80,7 @@ fn main() {
     }
 }
 
-fn run() -> Result<(), String> {
+fn run() -> Result<()> {
     let args = Args::parse();
 
     if let Some(path) = args.generate_man {

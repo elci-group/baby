@@ -1,4 +1,5 @@
 use baby::config::{ProjectConfig, load_all_configs};
+use baby::error::{BabyError, Result};
 use baby::setup_logging;
 use clap::{Parser, Subcommand};
 use std::fs;
@@ -83,7 +84,7 @@ fn main() {
     }
 }
 
-fn run() -> Result<(), String> {
+fn run() -> Result<()> {
     let args = Args::parse();
 
     match args.command {
@@ -101,7 +102,7 @@ fn run() -> Result<(), String> {
     }
 }
 
-fn cmd_status() -> Result<(), String> {
+fn cmd_status() -> Result<()> {
     if let Some(pid) = baby::read_pid_file() {
         if baby::is_process_alive(pid) {
             log::info!("birthd is running (pid {})", pid);
@@ -131,46 +132,36 @@ fn cmd_status() -> Result<(), String> {
     Ok(())
 }
 
-fn cmd_reload() -> Result<(), String> {
-    if let Some(pid) = baby::read_pid_file() {
-        if baby::is_process_alive(pid) {
-            unsafe {
-                libc::kill(pid as i32, libc::SIGHUP);
-            }
-            log::info!("birthd reload signaled (pid {})", pid);
-            Ok(())
-        } else {
-            Err(format!("birthd process {} is not alive", pid))
-        }
-    } else {
-        Err("birthd is not running".to_string())
+fn cmd_reload() -> Result<()> {
+    let pid = baby::read_pid_file().ok_or_else(BabyError::pid_not_found)?;
+    if !baby::is_process_alive(pid) {
+        return Err(BabyError::process_not_alive(pid));
     }
+    unsafe {
+        libc::kill(pid as i32, libc::SIGHUP);
+    }
+    log::info!("birthd reload signaled (pid {})", pid);
+    Ok(())
 }
 
-fn cmd_stop() -> Result<(), String> {
-    if let Some(pid) = baby::read_pid_file() {
-        if baby::is_process_alive(pid) {
-            unsafe {
-                libc::kill(pid as i32, libc::SIGTERM);
-            }
-            log::info!("birthd stop signaled (pid {})", pid);
-            Ok(())
-        } else {
-            baby::remove_pid_file();
-            Err(format!(
-                "birthd process {} was not alive, cleaned up pid file",
-                pid
-            ))
-        }
-    } else {
-        Err("birthd is not running".to_string())
+fn cmd_stop() -> Result<()> {
+    let pid = baby::read_pid_file().ok_or_else(BabyError::pid_not_found)?;
+    if !baby::is_process_alive(pid) {
+        baby::remove_pid_file();
+        return Err(BabyError::process_not_alive(pid));
     }
+    unsafe {
+        libc::kill(pid as i32, libc::SIGTERM);
+    }
+    log::info!("birthd stop signaled (pid {})", pid);
+    Ok(())
 }
 
-fn cmd_logs() -> Result<(), String> {
+fn cmd_logs() -> Result<()> {
     let path = baby::log_file_path();
     if path.exists() {
-        let content = fs::read_to_string(&path).map_err(|e| format!("failed to read logs: {e}"))?;
+        let content = fs::read_to_string(&path)
+            .map_err(|e| BabyError::io(format!("read logs {}", path.display()), e))?;
         print!("{}", content);
     } else {
         log::info!("no logs found at {}", path.display());
@@ -184,7 +175,14 @@ fn cmd_watch(
     install: PathBuf,
     restart: Option<String>,
     build: String,
-) -> Result<(), String> {
+) -> Result<()> {
+    if paths.is_empty() {
+        return Err(BabyError::new(
+            baby::error::ErrorKind::ConfigParse,
+            "watch requires at least one --path",
+        ));
+    }
+
     let config = ProjectConfig {
         project,
         watch: paths
@@ -201,8 +199,13 @@ fn cmd_watch(
         user: false,
     };
 
-    let toml = toml::to_string_pretty(&config).map_err(|e| format!("serialize failed: {e}"))?;
-    fs::write(".birth.toml", toml).map_err(|e| format!("write failed: {e}"))?;
+    let toml = toml::to_string_pretty(&config).map_err(|e| {
+        BabyError::new(
+            baby::error::ErrorKind::ConfigParse,
+            format!("serialize failed: {e}"),
+        )
+    })?;
+    fs::write(".birth.toml", toml).map_err(|e| BabyError::io("write .birth.toml", e))?;
     log::info!("created .birth.toml in current directory");
 
     // Signal reload if daemon is running
