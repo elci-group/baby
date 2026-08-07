@@ -62,6 +62,24 @@ fn birthctl_status_when_not_running() {
 }
 
 #[test]
+fn birthctl_reload_when_not_running_fails() {
+    let mut cmd = Command::cargo_bin("birthctl").unwrap();
+    cmd.arg("reload");
+    cmd.assert()
+        .failure()
+        .stderr(predicate::str::contains("birthd is not running"));
+}
+
+#[test]
+fn birthctl_stop_when_not_running_fails() {
+    let mut cmd = Command::cargo_bin("birthctl").unwrap();
+    cmd.arg("stop");
+    cmd.assert()
+        .failure()
+        .stderr(predicate::str::contains("birthd is not running"));
+}
+
+#[test]
 fn birthctl_watch_creates_config() {
     let dir = tempfile::tempdir().unwrap();
     let mut cmd = Command::cargo_bin("birthctl").unwrap();

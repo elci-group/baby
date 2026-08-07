@@ -428,3 +428,99 @@ pub fn run_binary(path: &Path, args: &[String]) -> Result<()> {
 
     std::process::exit(status.code().unwrap_or(1));
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::ErrorKind;
+    use std::sync::Mutex;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    #[test]
+    fn infer_project_name_from_temp_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let original = env::current_dir().unwrap();
+        env::set_current_dir(&dir).unwrap();
+        let name = infer_project_name().unwrap();
+        assert!(!name.is_empty());
+        env::set_current_dir(original).unwrap();
+    }
+
+    #[test]
+    fn home_local_bin_requires_home() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        unsafe { env::remove_var("HOME") };
+        let err = home_local_bin().unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::HomeNotSet);
+    }
+
+    #[test]
+    fn xdg_runtime_dir_uses_env() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        unsafe { env::set_var("XDG_RUNTIME_DIR", "/custom/run") };
+        assert_eq!(xdg_runtime_dir(), PathBuf::from("/custom/run"));
+        unsafe { env::remove_var("XDG_RUNTIME_DIR") };
+        assert_eq!(xdg_runtime_dir(), PathBuf::from("/tmp"));
+    }
+
+    #[test]
+    fn xdg_state_dir_falls_back_to_local_state() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        unsafe { env::remove_var("XDG_STATE_HOME") };
+        unsafe { env::set_var("HOME", "/home/test") };
+        assert_eq!(xdg_state_dir(), PathBuf::from("/home/test/.local/state"));
+    }
+
+    #[test]
+    fn pid_file_round_trip() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        unsafe { env::set_var("XDG_RUNTIME_DIR", dir.path()) };
+
+        assert!(read_pid_file().is_none());
+        write_pid_file(12345).unwrap();
+        assert_eq!(read_pid_file(), Some(12345));
+        remove_pid_file();
+        assert!(read_pid_file().is_none());
+    }
+
+    #[test]
+    fn process_alive_with_current_process() {
+        let pid = std::process::id();
+        assert!(is_process_alive(pid));
+    }
+
+    #[test]
+    fn process_not_alive_for_high_pid() {
+        // PID 99999 is extremely unlikely to exist on a normal system.
+        assert!(!is_process_alive(99999));
+    }
+
+    #[test]
+    fn install_config_default() {
+        let cfg = InstallConfig::default();
+        assert!(!cfg.strip);
+        assert!(!cfg.backup);
+        assert!(!cfg.service);
+        assert!(!cfg.sudo);
+        assert!(!cfg.user);
+        assert!(!cfg.dry_run);
+        assert!(cfg.target_dir.is_none());
+        assert!(cfg.install_dir.is_none());
+    }
+
+    #[test]
+    fn format_command_joins_args() {
+        let mut cmd = Command::new("cargo");
+        cmd.arg("build").arg("--release");
+        assert_eq!(format_command(&cmd), "cargo build --release");
+    }
+
+    #[test]
+    fn command_failed_message_with_code() {
+        let err = BabyError::command_failed("strip", Some(1));
+        assert_eq!(err.kind(), ErrorKind::CommandFailed);
+        assert!(err.message().contains("status 1"));
+    }
+}
