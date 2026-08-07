@@ -3,7 +3,6 @@
 *.pdb
 /.kaptaind
 /.dreams
-/.skillastic
 /.brandi/state
 amber_report.json
 fract.report/
