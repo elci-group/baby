@@ -166,7 +166,6 @@ pub fn path_to_project_map(configs: &[(PathBuf, ProjectConfig)]) -> HashMap<Path
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
 
     #[test]
     fn parse_minimal_config() {
