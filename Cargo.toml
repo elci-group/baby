@@ -1,0 +1,20 @@
+[package]
+name = "baby"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+notify = { version = "7", default-features = false, features = ["macos_fsevent"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+signal-hook = "0.3"
+chrono = "0.4"
+libc = "0.2"
+env_logger = "0.11"
+log = "0.4"
+clap_mangen = "0.2"
+anstyle = "1"
+
+[profile.release]
+strip = false
