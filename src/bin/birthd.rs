@@ -108,15 +108,21 @@ fn run() -> Result<()> {
                 if is_relevant_event(&event)
                     && let Err(e) = handle_event(&state, &event)
                 {
-                    log::warn!("failed to handle event: {e}");
+                    log::warn!(
+                        "failed to handle event: {e}; check the watch path and restart birthd if this persists"
+                    );
                 }
             }
             Ok(Err(e)) => {
-                log::warn!("watch error: {e}");
+                log::warn!(
+                    "watch error: {e}; check the watched paths and restart birthd if this persists"
+                );
             }
             Err(RecvTimeoutError::Timeout) => {
                 if let Err(e) = process_pending(&state) {
-                    log::warn!("failed to process pending builds: {e}");
+                    log::warn!(
+                        "failed to process pending builds: {e}; check the build config and logs"
+                    );
                 }
             }
             Err(RecvTimeoutError::Disconnected) => {
@@ -152,7 +158,10 @@ fn setup_watchers(state: &Arc<Mutex<DaemonState>>) -> Result<()> {
                 RecursiveMode::NonRecursive
             };
             if let Err(e) = watcher.watch(&path, mode) {
-                log::warn!("failed to watch {}: {e}", path.display());
+                log::warn!(
+                    "failed to watch {}: {e}; check the path exists and restart birthd",
+                    path.display()
+                );
             } else {
                 log::info!("watching {}", path.display());
             }
