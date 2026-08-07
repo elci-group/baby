@@ -1,0 +1,34 @@
+{
+  "name": "baby-dev",
+  "skill_version": "1.0.0",
+  "compatible_apps": [
+    ">=0.1.0, <1.0.0"
+  ],
+  "created": "2026-08-07T20:57:48.520296513Z",
+  "last_verified": "2026-08-07",
+  "confidence": 0.95,
+  "status": "active",
+  "verified_app_version": "0.1.4",
+  "mutation_history": [],
+  "context": {
+    "frameworks": [],
+    "toolchains": [],
+    "directories": [
+      "src"
+    ],
+    "dependencies": {
+      "anstyle": "1",
+      "chrono": "0.4",
+      "clap": "4",
+      "clap_mangen": "0.2",
+      "env_logger": "0.11",
+      "libc": "0.2",
+      "log": "0.4",
+      "notify": "7",
+      "serde": "1",
+      "signal-hook": "0.3",
+      "toml": "0.8"
+    }
+  },
+  "body_path": "baby-dev.md"
+}
