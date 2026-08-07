@@ -37,19 +37,19 @@ impl Log for SimpleLogger {
         // Stderr is unbuffered; ignore write failures.
         let _ = io::stderr().write_all(line.as_bytes());
 
-        if let Some(ref file) = self.file {
-            if let Ok(mut file) = file.lock() {
-                let _ = file.write_all(line.as_bytes());
-            }
+        if let Some(ref file) = self.file
+            && let Ok(mut file) = file.lock()
+        {
+            let _ = file.write_all(line.as_bytes());
         }
     }
 
     fn flush(&self) {
         let _ = io::stderr().flush();
-        if let Some(ref file) = self.file {
-            if let Ok(mut file) = file.lock() {
-                let _ = file.flush();
-            }
+        if let Some(ref file) = self.file
+            && let Ok(mut file) = file.lock()
+        {
+            let _ = file.flush();
         }
     }
 }
