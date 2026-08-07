@@ -21,6 +21,8 @@ minor = 0.6    # score at or above this bumps Minor
 patch = 0.1    # score at or above this bumps Patch; below it, no commit
 
 [push]
+# GitHub branch protection on `main` rejects kaptaind's auto-pushes, so commits
+# are local only. Maintainers push manually or configure a kaptaind GitHub App bypass.
 enabled = false
 branch = "main"
 
@@ -30,6 +32,11 @@ min_commit_interval = 10
 [test]
 command = "cargo test"
 required = true
+
+[daemon]
+# Refuse to start on a dirty worktree so accidental daemon restarts do not
+# catch up and auto-commit half-finished work.
+startup_guard = true
 
 # [staging]
 # mode = "cluster"    # "cluster" (default, only observed changes), "pattern",
