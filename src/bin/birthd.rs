@@ -108,11 +108,11 @@ fn run() -> Result<()> {
 
         match rx.recv_timeout(Duration::from_millis(100)) {
             Ok(Ok(event)) => {
-                if is_relevant_event(&event) {
-                    if let Err(e) = handle_event(&state, &event) {
-                        log::warn!("failed to handle event: {e}");
-                        log_message(&format!("failed to handle event: {e}"));
-                    }
+                if is_relevant_event(&event)
+                    && let Err(e) = handle_event(&state, &event)
+                {
+                    log::warn!("failed to handle event: {e}");
+                    log_message(&format!("failed to handle event: {e}"));
                 }
             }
             Ok(Err(e)) => {
