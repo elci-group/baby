@@ -1,0 +1,49 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH birthctl 1  "birthctl 0.2.11" 
+.SH NAME
+birthctl \- Control and query the birthd build daemon
+.SH SYNOPSIS
+\fBbirthctl\fR [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] <\fIsubcommands\fR>
+.SH DESCRIPTION
+.PP
+birthctl — control and query the birthd build daemon
+.PP
+birthctl talks to the birthd daemon via PID\-file and signal\-based IPC. It can
+show status, reload configuration, stop the daemon, stream logs, and generate
+local per\-project configuration files.
+.PP
+Examples:
+  birthctl status            # show daemon status and watched projects
+  birthctl reload            # tell birthd to reload its configs
+  birthctl stop              # gracefully stop the daemon
+  birthctl logs              # tail the daemon log file
+  birthctl watch \-\-project foo \-\-path src/ \-\-path Cargo.toml
+.SH OPTIONS
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Print version
+.SH SUBCOMMANDS
+.TP
+birthctl\-status(1)
+Show daemon status and watched projects
+.TP
+birthctl\-reload(1)
+Reload daemon configuration
+.TP
+birthctl\-stop(1)
+Stop the daemon
+.TP
+birthctl\-logs(1)
+Show recent daemon logs
+.TP
+birthctl\-watch(1)
+Add a local .birth.toml for the current directory
+.TP
+birthctl\-help(1)
+Print this message or the help of the given subcommand(s)
+.SH VERSION
+v0.2.11

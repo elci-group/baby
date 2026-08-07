@@ -1,0 +1,61 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH baby 1  "baby 0.2.11" 
+.SH NAME
+baby \- Build a Rust project and install the release binary
+.SH SYNOPSIS
+\fBbaby\fR [\fB\-\-run\fR] [\fB\-\-strip\fR] [\fB\-\-backup\fR] [\fB\-\-service\fR] [\fB\-\-sudo\fR] [\fB\-\-user\fR] [\fB\-\-dry\-run\fR] [\fB\-\-target\-dir\fR] [\fB\-\-install\-dir\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] [\fIRUN_ARGS\fR] 
+.SH DESCRIPTION
+.PP
+BABY — Build And Bin Yield
+.PP
+Build a Rust project in release mode and install the resulting binary.
+.PP
+By default the binary is installed to /usr/local/bin. Use \-\-user to install
+to ~/.local/bin instead, or \-\-install\-dir for a custom location.
+.PP
+Examples:
+  baby                      # build + install to /usr/local/bin
+  baby \-\-user               # build + install to ~/.local/bin
+  baby \-\-run                # build + install + execute
+  baby \-\-run \-\- \-\-help      # pass \-\-help to the installed binary
+  baby \-\-dry\-run            # preview what would be done
+.SH OPTIONS
+.TP
+\fB\-\-run\fR
+Build, install, then execute the binary
+.TP
+\fB\-\-strip\fR
+Strip symbols before installing
+.TP
+\fB\-\-backup\fR
+Backup existing binary before overwriting
+.TP
+\fB\-\-service\fR
+Restart matching systemd service after install
+.TP
+\fB\-\-sudo\fR
+Force privileged (sudo) install
+.TP
+\fB\-\-user\fR
+Install to ~/.local/bin instead of /usr/local/bin
+.TP
+\fB\-\-dry\-run\fR
+Show what would happen without executing
+.TP
+\fB\-\-target\-dir\fR \fI<TARGET_DIR>\fR
+Custom target directory (default: target/release)
+.TP
+\fB\-\-install\-dir\fR \fI<INSTALL_DIR>\fR
+Custom install directory (overrides \-\-user)
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Print version
+.TP
+[\fIRUN_ARGS\fR]
+Pass additional arguments when running with \-\-run
+.SH VERSION
+v0.2.11

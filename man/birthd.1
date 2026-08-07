@@ -1,0 +1,30 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH birthd 1  "birthd 0.2.11" 
+.SH NAME
+birthd \- Build daemon that watches and rebuilds Rust projects
+.SH SYNOPSIS
+\fBbirthd\fR [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] 
+.SH DESCRIPTION
+.PP
+birthd — build daemon that watches Rust projects and rebuilds on change
+.PP
+birthd scans for .birth.toml files, sets up filesystem watchers, and
+automatically rebuilds and reinstalls binaries when source files change.
+.PP
+It stores its PID in $XDG_RUNTIME_DIR/birthd.pid (or /tmp/birthd.pid) and
+writes logs to $XDG_STATE_HOME/birthd.log (or ~/.local/state/birthd.log).
+.PP
+Signals:
+  SIGHUP   — reload configuration
+  SIGTERM  — graceful shutdown
+  SIGINT   — graceful shutdown
+.SH OPTIONS
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Print version
+.SH VERSION
+v0.2.11
