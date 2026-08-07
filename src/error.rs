@@ -32,15 +32,22 @@ pub enum ErrorKind {
 impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ErrorKind::Io => write!(f, "I/O error"),
-            ErrorKind::CommandFailed => write!(f, "command failed"),
-            ErrorKind::ConfigParse => write!(f, "config parse error"),
-            ErrorKind::ProjectNameInference => write!(f, "project name inference error"),
-            ErrorKind::HomeNotSet => write!(f, "HOME not set"),
-            ErrorKind::PidNotFound => write!(f, "PID file not found"),
-            ErrorKind::ProcessNotAlive => write!(f, "process not alive"),
-            ErrorKind::Daemon => write!(f, "daemon error"),
-            ErrorKind::Watch => write!(f, "watch error"),
+            ErrorKind::Io => write!(f, "I/O error; check the path and permissions and retry"),
+            ErrorKind::CommandFailed => {
+                write!(f, "command failed; inspect the output and fix the reported issue")
+            }
+            ErrorKind::ConfigParse => {
+                write!(f, "config parse error; check the file syntax and retry")
+            }
+            ErrorKind::ProjectNameInference => write!(
+                f,
+                "project name inference error; run from a project directory or pass --project"
+            ),
+            ErrorKind::HomeNotSet => write!(f, "HOME not set; set HOME or run with a valid user environment"),
+            ErrorKind::PidNotFound => write!(f, "PID file not found; start birthd with `birthd`"),
+            ErrorKind::ProcessNotAlive => write!(f, "process not alive; start birthd with `birthd`"),
+            ErrorKind::Daemon => write!(f, "daemon error; check the logs and restart birthd"),
+            ErrorKind::Watch => write!(f, "watch error; check the watch path and restart birthd"),
         }
     }
 }
@@ -93,7 +100,7 @@ impl BabyError {
     pub fn project_name() -> Self {
         Self {
             kind: ErrorKind::ProjectNameInference,
-            message: "cannot infer project name from current directory".into(),
+            message: "cannot infer project name from current directory; use --project or run inside a Rust project directory".into(),
         }
     }
 
@@ -101,7 +108,7 @@ impl BabyError {
     pub fn home_not_set() -> Self {
         Self {
             kind: ErrorKind::HomeNotSet,
-            message: "HOME environment variable is not set".into(),
+            message: "HOME environment variable is not set; set HOME to your home directory".into(),
         }
     }
 
@@ -109,7 +116,7 @@ impl BabyError {
     pub fn pid_not_found() -> Self {
         Self {
             kind: ErrorKind::PidNotFound,
-            message: "birthd is not running".into(),
+            message: "birthd is not running; start it with `birthd`".into(),
         }
     }
 
@@ -117,7 +124,7 @@ impl BabyError {
     pub fn process_not_alive(pid: u32) -> Self {
         Self {
             kind: ErrorKind::ProcessNotAlive,
-            message: format!("process {} is not alive", pid),
+            message: format!("process {} is not alive; start birthd with `birthd`", pid),
         }
     }
 
@@ -165,7 +172,10 @@ mod tests {
 
     #[test]
     fn error_kind_display() {
-        assert_eq!(ErrorKind::Io.to_string(), "I/O error");
+        assert_eq!(
+            ErrorKind::Io.to_string(),
+            "I/O error; check the path and permissions and retry"
+        );
     }
 
     #[test]
