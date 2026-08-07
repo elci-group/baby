@@ -51,6 +51,51 @@ fn default_debounce() -> u64 {
     500
 }
 
+impl ProjectConfig {
+    /// Validate the configuration and return a descriptive error if invalid.
+    pub fn validate(&self) -> Result<()> {
+        if self.project.trim().is_empty() {
+            return Err(BabyError::new(
+                crate::error::ErrorKind::ConfigParse,
+                "project name must not be empty",
+            ));
+        }
+        if self.project.contains('/') || self.project.contains('\\') {
+            return Err(BabyError::new(
+                crate::error::ErrorKind::ConfigParse,
+                format!("project name '{}' contains path separators", self.project),
+            ));
+        }
+        if self.watch.is_empty() {
+            return Err(BabyError::new(
+                crate::error::ErrorKind::ConfigParse,
+                format!("project '{}' must watch at least one path", self.project),
+            ));
+        }
+        for w in &self.watch {
+            if w.trim().is_empty() {
+                return Err(BabyError::new(
+                    crate::error::ErrorKind::ConfigParse,
+                    format!("project '{}' has an empty watch path", self.project),
+                ));
+            }
+        }
+        if self.build.trim().is_empty() {
+            return Err(BabyError::new(
+                crate::error::ErrorKind::ConfigParse,
+                format!("project '{}' build command must not be empty", self.project),
+            ));
+        }
+        if self.install.as_os_str().is_empty() {
+            return Err(BabyError::new(
+                crate::error::ErrorKind::ConfigParse,
+                format!("project '{}' install directory must not be empty", self.project),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Load all birthd configs from the standard directories and the current directory.
 pub fn load_all_configs() -> Vec<(PathBuf, ProjectConfig)> {
     let mut configs = vec![];
