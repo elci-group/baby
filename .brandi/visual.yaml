@@ -1,11 +1,11 @@
 palette:
-  primary: "#FF2DAA"
-  secondary: ["#FF78C8", "#DCA7FF", "#FF4D6D", "#FFB020", "#58D5FF"]
-  neutrals: ["#FFF7FC", "#160812", "#6F5B68"]
+  primary: "#0EA5E9"
+  secondary: ["#38BDF8", "#7DD3FC", "#0284C7", "#0369A1", "#BAE6FD"]
+  neutrals: ["#F8FAFC", "#0F172A", "#475569"]
 color_tolerance: 24
 typography:
   style: technical_modern
-  preferred_fonts: []
+  preferred_fonts: [Inter, JetBrains Mono]
 assets:
   social_card: { width: 1200, height: 630 }
   thumbnail: { width: 1280, height: 720 }
