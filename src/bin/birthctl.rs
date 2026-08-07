@@ -1,4 +1,4 @@
-use baby::config::{load_all_configs, ProjectConfig};
+use baby::config::{ProjectConfig, load_all_configs};
 use baby::setup_logging;
 use clap::{Parser, Subcommand};
 use std::fs;
@@ -157,7 +157,10 @@ fn cmd_stop() -> Result<(), String> {
             Ok(())
         } else {
             baby::remove_pid_file();
-            Err(format!("birthd process {} was not alive, cleaned up pid file", pid))
+            Err(format!(
+                "birthd process {} was not alive, cleaned up pid file",
+                pid
+            ))
         }
     } else {
         Err("birthd is not running".to_string())
@@ -167,8 +170,7 @@ fn cmd_stop() -> Result<(), String> {
 fn cmd_logs() -> Result<(), String> {
     let path = baby::log_file_path();
     if path.exists() {
-        let content = fs::read_to_string(&path)
-            .map_err(|e| format!("failed to read logs: {e}"))?;
+        let content = fs::read_to_string(&path).map_err(|e| format!("failed to read logs: {e}"))?;
         print!("{}", content);
     } else {
         log::info!("no logs found at {}", path.display());
@@ -185,7 +187,10 @@ fn cmd_watch(
 ) -> Result<(), String> {
     let config = ProjectConfig {
         project,
-        watch: paths.into_iter().map(|p| p.to_string_lossy().to_string()).collect(),
+        watch: paths
+            .into_iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect(),
         build,
         install,
         restart,

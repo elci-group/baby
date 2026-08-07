@@ -1,5 +1,5 @@
-use baby::config::{load_all_configs, path_to_project_map, ProjectConfig};
-use baby::{build_and_install, setup_logging, InstallConfig};
+use baby::config::{ProjectConfig, load_all_configs, path_to_project_map};
+use baby::{InstallConfig, build_and_install, setup_logging};
 use chrono::Local;
 use clap::Parser;
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
@@ -8,7 +8,7 @@ use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{channel, RecvTimeoutError};
+use std::sync::mpsc::{RecvTimeoutError, channel};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -276,7 +276,11 @@ fn is_relevant_event(event: &Event) -> bool {
 }
 
 fn log_message(msg: &str) {
-    let line = format!("{} [birthd] {}\n", Local::now().format("%Y-%m-%d %H:%M:%S"), msg);
+    let line = format!(
+        "{} [birthd] {}\n",
+        Local::now().format("%Y-%m-%d %H:%M:%S"),
+        msg
+    );
     let path = baby::log_file_path();
     if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);

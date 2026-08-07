@@ -13,35 +13,12 @@ pub mod styles {
                     .underline()
                     .fg_color(Some(AnsiColor::Green.into())),
             )
-            .usage(
-                Style::new()
-                    .bold()
-                    .fg_color(Some(AnsiColor::Yellow.into())),
-            )
-            .literal(
-                Style::new()
-                    .bold()
-                    .fg_color(Some(AnsiColor::Cyan.into())),
-            )
-            .placeholder(
-                Style::new()
-                    .fg_color(Some(AnsiColor::White.into())),
-            )
-            .error(
-                Style::new()
-                    .bold()
-                    .fg_color(Some(AnsiColor::Red.into())),
-            )
-            .valid(
-                Style::new()
-                    .bold()
-                    .fg_color(Some(AnsiColor::Green.into())),
-            )
-            .invalid(
-                Style::new()
-                    .bold()
-                    .fg_color(Some(AnsiColor::Red.into())),
-            )
+            .usage(Style::new().bold().fg_color(Some(AnsiColor::Yellow.into())))
+            .literal(Style::new().bold().fg_color(Some(AnsiColor::Cyan.into())))
+            .placeholder(Style::new().fg_color(Some(AnsiColor::White.into())))
+            .error(Style::new().bold().fg_color(Some(AnsiColor::Red.into())))
+            .valid(Style::new().bold().fg_color(Some(AnsiColor::Green.into())))
+            .invalid(Style::new().bold().fg_color(Some(AnsiColor::Red.into())))
     }
 }
 
@@ -78,6 +55,7 @@ pub fn generate_man(cmd: &clap::Command, path: &Path) -> Result<(), String> {
     Ok(())
 }
 
+#[derive(Default)]
 pub struct InstallConfig {
     pub strip: bool,
     pub backup: bool,
@@ -87,21 +65,6 @@ pub struct InstallConfig {
     pub dry_run: bool,
     pub target_dir: Option<PathBuf>,
     pub install_dir: Option<PathBuf>,
-}
-
-impl Default for InstallConfig {
-    fn default() -> Self {
-        Self {
-            strip: false,
-            backup: false,
-            service: false,
-            sudo: false,
-            user: false,
-            dry_run: false,
-            target_dir: None,
-            install_dir: None,
-        }
-    }
 }
 
 pub fn infer_project_name() -> Result<String, String> {
@@ -171,8 +134,7 @@ pub fn write_pid_file(pid: u32) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);
     }
-    fs::write(&path, pid.to_string())
-        .map_err(|e| format!("failed to write pid file: {e}"))
+    fs::write(&path, pid.to_string()).map_err(|e| format!("failed to write pid file: {e}"))
 }
 
 pub fn remove_pid_file() {
@@ -192,7 +154,11 @@ pub fn build_and_install(config: &InstallConfig) -> Result<(), String> {
         .clone()
         .unwrap_or_else(|| PathBuf::from("target/release"));
     let binary_path = release_dir.join(&project);
-    log::debug!("release dir: {release_dir}, binary path: {binary_path}", release_dir = release_dir.display(), binary_path = binary_path.display());
+    log::debug!(
+        "release dir: {release_dir}, binary path: {binary_path}",
+        release_dir = release_dir.display(),
+        binary_path = binary_path.display()
+    );
 
     let install_dir = if let Some(ref dir) = config.install_dir {
         dir.clone()
@@ -203,7 +169,11 @@ pub fn build_and_install(config: &InstallConfig) -> Result<(), String> {
     };
 
     let install_path = install_dir.join(&project);
-    log::debug!("install dir: {install_dir}, install path: {install_path}", install_dir = install_dir.display(), install_path = install_path.display());
+    log::debug!(
+        "install dir: {install_dir}, install path: {install_path}",
+        install_dir = install_dir.display(),
+        install_path = install_path.display()
+    );
 
     cargo_build_release(config, &release_dir)?;
 
@@ -224,7 +194,11 @@ pub fn build_and_install(config: &InstallConfig) -> Result<(), String> {
     }
 
     if !config.dry_run {
-        log::info!("installed {} -> {}", binary_path.display(), install_path.display());
+        log::info!(
+            "installed {} -> {}",
+            binary_path.display(),
+            install_path.display()
+        );
     }
 
     Ok(())
@@ -312,7 +286,10 @@ fn ensure_install_dir(config: &InstallConfig, dir: &Path) -> Result<(), String> 
 
 fn backup_existing(config: &InstallConfig, install_path: &Path) -> Result<(), String> {
     if !install_path.exists() {
-        log::debug!("no existing binary at {}, skipping backup", install_path.display());
+        log::debug!(
+            "no existing binary at {}, skipping backup",
+            install_path.display()
+        );
         return Ok(());
     }
     let backup_path = install_path.with_extension("backup");
@@ -340,7 +317,11 @@ fn backup_existing(config: &InstallConfig, install_path: &Path) -> Result<(), St
         return Err("backup failed".to_string());
     }
 
-    log::info!("backed up {} -> {}", install_path.display(), backup_path.display());
+    log::info!(
+        "backed up {} -> {}",
+        install_path.display(),
+        backup_path.display()
+    );
     Ok(())
 }
 

@@ -69,10 +69,10 @@ pub fn load_all_configs() -> Vec<(PathBuf, ProjectConfig)> {
 }
 
 pub fn load_config_file(path: &Path) -> Result<ProjectConfig, String> {
-    let content = fs::read_to_string(path)
-        .map_err(|e| format!("failed to read {}: {e}", path.display()))?;
-    let mut cfg: ProjectConfig = toml::from_str(&content)
-        .map_err(|e| format!("failed to parse {}: {e}", path.display()))?;
+    let content =
+        fs::read_to_string(path).map_err(|e| format!("failed to read {}: {e}", path.display()))?;
+    let mut cfg: ProjectConfig =
+        toml::from_str(&content).map_err(|e| format!("failed to parse {}: {e}", path.display()))?;
 
     // Resolve watch paths relative to the config file's directory
     let base = path.parent().unwrap_or(Path::new("."));
@@ -87,9 +87,7 @@ pub fn load_config_file(path: &Path) -> Result<ProjectConfig, String> {
 }
 
 /// Build a map from watched path to the project config that owns it.
-pub fn path_to_project_map(
-    configs: &[(PathBuf, ProjectConfig)],
-) -> HashMap<PathBuf, Vec<usize>> {
+pub fn path_to_project_map(configs: &[(PathBuf, ProjectConfig)]) -> HashMap<PathBuf, Vec<usize>> {
     let mut map: HashMap<PathBuf, Vec<usize>> = HashMap::new();
     for (idx, (_, cfg)) in configs.iter().enumerate() {
         for w in &cfg.watch {

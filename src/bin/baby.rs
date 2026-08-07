@@ -1,4 +1,4 @@
-use baby::{build_and_install, run_binary, setup_logging, InstallConfig};
+use baby::{InstallConfig, build_and_install, run_binary, setup_logging};
 use clap::Parser;
 use std::path::PathBuf;
 
