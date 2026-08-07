@@ -202,7 +202,7 @@ fn cmd_watch(
     let toml = toml::to_string_pretty(&config).map_err(|e| {
         BabyError::new(
             baby::error::ErrorKind::ConfigParse,
-            format!("serialize failed: {e}"),
+            format!("failed to serialize .birth.toml: {e}; check the config values and retry"),
         )
     })?;
     fs::write(".birth.toml", toml).map_err(|e| BabyError::io("write .birth.toml", e))?;
