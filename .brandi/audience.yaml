@@ -1,9 +1,20 @@
 segments:
+  - name: rust_developers
+    description: "Rust engineers who build and ship CLI tools and services"
+    pains: ["repetitive cargo build + install cycles", "manual binary deployment", "no file-watch rebuilds"]
   - name: platform_engineers
-    description: "Teams responsible for engineering governance"
-    pains: ["identity drift", "inconsistent UX copy"]
+    description: "Teams responsible for developer experience and build automation"
+    pains: ["inconsistent install paths", "privileged install drift", "no observability into local builds"]
 narratives:
-  - capability: "brand linting"
-    narrative: "prevent identity drift before it ships"
+  - capability: "one-shot install"
+    narrative: "build and install a Rust binary in a single command"
+    audiences: [rust_developers]
+    formats: [docs, demo_video, x_post]
+  - capability: "watch daemon"
+    narrative: "keep development binaries fresh without touching the terminal"
+    audiences: [rust_developers, platform_engineers]
+    formats: [docs, blog, demo_video]
+  - capability: "config-driven deployment"
+    narrative: "declare how each project builds and installs with a simple TOML file"
     audiences: [platform_engineers]
-    formats: [x_post, blog, demo_video, docs]
+    formats: [docs, blog]
