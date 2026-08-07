@@ -65,16 +65,16 @@ fn main() {
     setup_logging();
 
     // Handle --generate-man before clap enforces subcommand rules.
-    if let Some(pos) = std::env::args().position(|a| a == "--generate-man") {
-        if let Some(path) = std::env::args().nth(pos + 1) {
-            let cmd = <Args as clap::CommandFactory>::command();
-            if let Err(e) = baby::generate_man(&cmd, &PathBuf::from(path)) {
-                log::error!("{e}");
-                std::process::exit(1);
-            }
-            log::info!("man page written");
-            std::process::exit(0);
+    if let Some(pos) = std::env::args().position(|a| a == "--generate-man")
+        && let Some(path) = std::env::args().nth(pos + 1)
+    {
+        let cmd = <Args as clap::CommandFactory>::command();
+        if let Err(e) = baby::generate_man(&cmd, &PathBuf::from(path)) {
+            log::error!("{e}");
+            std::process::exit(1);
         }
+        log::info!("man page written");
+        std::process::exit(0);
     }
 
     if let Err(e) = run() {
@@ -206,13 +206,13 @@ fn cmd_watch(
     log::info!("created .birth.toml in current directory");
 
     // Signal reload if daemon is running
-    if let Some(pid) = baby::read_pid_file() {
-        if baby::is_process_alive(pid) {
-            unsafe {
-                libc::kill(pid as i32, libc::SIGHUP);
-            }
-            log::info!("birthd reload signaled");
+    if let Some(pid) = baby::read_pid_file()
+        && baby::is_process_alive(pid)
+    {
+        unsafe {
+            libc::kill(pid as i32, libc::SIGHUP);
         }
+        log::info!("birthd reload signaled");
     }
 
     Ok(())
