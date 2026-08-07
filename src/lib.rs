@@ -1,5 +1,6 @@
 pub mod config;
 pub mod error;
+pub mod logger;
 
 pub mod styles {
     //! Styling helpers for CLI output.
@@ -31,16 +32,13 @@ use std::process::{Command, Stdio};
 
 use crate::error::{BabyError, Result};
 
-/// Initialise `env_logger` with a default filter of `info`.
+/// Initialise logging with a default filter of `info`.
 ///
 /// Call this early in `main()` so that `log::info!`, `log::warn!`, etc. work
 /// immediately. The user can override the level via the `RUST_LOG` environment
-/// variable (e.g. `RUST_LOG=baby=trace`).
+/// variable (`error`, `warn`, `info`, `debug`, `trace`).
 pub fn setup_logging() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
-        .format_timestamp_secs()
-        .format_target(false)
-        .init();
+    crate::logger::setup_logging();
 }
 
 /// Write a man page for the given clap `Command` to the supplied path.

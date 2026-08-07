@@ -1,12 +1,9 @@
 use baby::config::{ProjectConfig, load_all_configs, path_to_project_map};
 use baby::error::{BabyError, Result};
-use baby::{InstallConfig, build_and_install, setup_logging};
-use chrono::Local;
+use baby::{InstallConfig, build_and_install};
 use clap::Parser;
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::{HashMap, HashSet};
-use std::fs::{self, OpenOptions};
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{RecvTimeoutError, channel};
@@ -48,9 +45,8 @@ struct DaemonState {
 }
 
 fn main() {
-    setup_logging();
     if let Err(e) = run() {
-        log::error!("{e}");
+        eprintln!("{e}");
         std::process::exit(1);
     }
 }
@@ -64,6 +60,8 @@ fn run() -> Result<()> {
         log::info!("man page written to {}", path.display());
         return Ok(());
     }
+
+    baby::logger::setup_daemon_logging(&baby::log_file_path())?;
 
     let pid = std::process::id();
     baby::write_pid_file(pid)?;
@@ -99,7 +97,6 @@ fn run() -> Result<()> {
     setup_watchers(&state)?;
 
     log::info!("birthd started (pid {})", pid);
-    log_message("birthd started");
 
     loop {
         if !running.load(Ordering::Relaxed) {
@@ -112,29 +109,24 @@ fn run() -> Result<()> {
                     && let Err(e) = handle_event(&state, &event)
                 {
                     log::warn!("failed to handle event: {e}");
-                    log_message(&format!("failed to handle event: {e}"));
                 }
             }
             Ok(Err(e)) => {
                 log::warn!("watch error: {e}");
-                log_message(&format!("watch error: {e}"));
             }
             Err(RecvTimeoutError::Timeout) => {
                 if let Err(e) = process_pending(&state) {
                     log::warn!("failed to process pending builds: {e}");
-                    log_message(&format!("failed to process pending builds: {e}"));
                 }
             }
             Err(RecvTimeoutError::Disconnected) => {
                 log::warn!("watch channel disconnected, shutting down");
-                log_message("watch channel disconnected, shutting down");
                 break;
             }
         }
     }
 
     log::info!("birthd shutting down");
-    log_message("birthd shutting down");
     baby::remove_pid_file();
     Ok(())
 }
@@ -161,10 +153,8 @@ fn setup_watchers(state: &Arc<Mutex<DaemonState>>) -> Result<()> {
             };
             if let Err(e) = watcher.watch(&path, mode) {
                 log::warn!("failed to watch {}: {e}", path.display());
-                log_message(&format!("failed to watch {}: {e}", path.display()));
             } else {
                 log::info!("watching {}", path.display());
-                log_message(&format!("watching {}", path.display()));
             }
         }
     }
@@ -217,7 +207,6 @@ fn process_pending(state: &Arc<Mutex<DaemonState>>) -> Result<()> {
         };
 
         log::info!("rebuilding {}", cfg.project);
-        log_message(&format!("rebuilding {}", cfg.project));
 
         let install_cfg = InstallConfig {
             strip: cfg.strip,
@@ -246,12 +235,10 @@ fn process_pending(state: &Arc<Mutex<DaemonState>>) -> Result<()> {
 
             if !status.success() {
                 log::warn!("build failed for {}", cfg.project);
-                log_message(&format!("build failed for {}", cfg.project));
                 continue;
             }
         } else if let Err(e) = build_and_install(&install_cfg) {
             log::warn!("build failed for {}: {e}", cfg.project);
-            log_message(&format!("build failed for {}: {e}", cfg.project));
             continue;
         }
 
@@ -265,11 +252,9 @@ fn process_pending(state: &Arc<Mutex<DaemonState>>) -> Result<()> {
             }
             let _ = cmd.status();
             log::info!("restarted {}", service);
-            log_message(&format!("restarted {}", service));
         }
 
         log::info!("{} rebuilt successfully", cfg.project);
-        log_message(&format!("{} rebuilt successfully", cfg.project));
     }
 
     Ok(())
@@ -278,19 +263,4 @@ fn process_pending(state: &Arc<Mutex<DaemonState>>) -> Result<()> {
 fn is_relevant_event(event: &Event) -> bool {
     use notify::EventKind::*;
     matches!(event.kind, Create(_) | Modify(_) | Remove(_))
-}
-
-fn log_message(msg: &str) {
-    let line = format!(
-        "{} [birthd] {}\n",
-        Local::now().format("%Y-%m-%d %H:%M:%S"),
-        msg
-    );
-    let path = baby::log_file_path();
-    if let Some(parent) = path.parent() {
-        let _ = fs::create_dir_all(parent);
-    }
-    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&path) {
-        let _ = file.write_all(line.as_bytes());
-    }
 }
