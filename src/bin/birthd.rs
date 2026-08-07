@@ -1,4 +1,5 @@
 use baby::config::{ProjectConfig, load_all_configs, path_to_project_map};
+use baby::error::{BabyError, Result};
 use baby::{InstallConfig, build_and_install, setup_logging};
 use chrono::Local;
 use clap::Parser;
@@ -54,7 +55,7 @@ fn main() {
     }
 }
 
-fn run() -> Result<(), String> {
+fn run() -> Result<()> {
     let args = Args::parse();
 
     if let Some(path) = args.generate_man {
@@ -81,14 +82,14 @@ fn run() -> Result<(), String> {
 
     reload_configs(&state)?;
 
-    let (tx, rx) = channel::<Result<Event, notify::Error>>();
+    let (tx, rx) = channel::<std::result::Result<Event, notify::Error>>();
     let watcher = RecommendedWatcher::new(
         move |res| {
             let _ = tx.send(res);
         },
         Config::default(),
     )
-    .map_err(|e| format!("failed to create watcher: {e}"))?;
+    .map_err(BabyError::watch)?;
 
     {
         let mut s = state.lock().unwrap();
@@ -108,7 +109,10 @@ fn run() -> Result<(), String> {
         match rx.recv_timeout(Duration::from_millis(100)) {
             Ok(Ok(event)) => {
                 if is_relevant_event(&event) {
-                    handle_event(&state, &event)?;
+                    if let Err(e) = handle_event(&state, &event) {
+                        log::warn!("failed to handle event: {e}");
+                        log_message(&format!("failed to handle event: {e}"));
+                    }
                 }
             }
             Ok(Err(e)) => {
@@ -116,7 +120,10 @@ fn run() -> Result<(), String> {
                 log_message(&format!("watch error: {e}"));
             }
             Err(RecvTimeoutError::Timeout) => {
-                process_pending(&state)?;
+                if let Err(e) = process_pending(&state) {
+                    log::warn!("failed to process pending builds: {e}");
+                    log_message(&format!("failed to process pending builds: {e}"));
+                }
             }
             Err(RecvTimeoutError::Disconnected) => {
                 log::warn!("watch channel disconnected, shutting down");
@@ -132,7 +139,7 @@ fn run() -> Result<(), String> {
     Ok(())
 }
 
-fn reload_configs(state: &Arc<Mutex<DaemonState>>) -> Result<(), String> {
+fn reload_configs(state: &Arc<Mutex<DaemonState>>) -> Result<()> {
     let configs = load_all_configs();
     let path_map = path_to_project_map(&configs);
     let mut s = state.lock().unwrap();
@@ -141,7 +148,7 @@ fn reload_configs(state: &Arc<Mutex<DaemonState>>) -> Result<(), String> {
     Ok(())
 }
 
-fn setup_watchers(state: &Arc<Mutex<DaemonState>>) -> Result<(), String> {
+fn setup_watchers(state: &Arc<Mutex<DaemonState>>) -> Result<()> {
     let mut s = state.lock().unwrap();
     let watched: HashSet<PathBuf> = s.path_map.keys().cloned().collect();
 
@@ -165,7 +172,7 @@ fn setup_watchers(state: &Arc<Mutex<DaemonState>>) -> Result<(), String> {
     Ok(())
 }
 
-fn handle_event(state: &Arc<Mutex<DaemonState>>, event: &Event) -> Result<(), String> {
+fn handle_event(state: &Arc<Mutex<DaemonState>>, event: &Event) -> Result<()> {
     let mut s = state.lock().unwrap();
     let now = Instant::now();
 
@@ -187,7 +194,7 @@ fn handle_event(state: &Arc<Mutex<DaemonState>>, event: &Event) -> Result<(), St
     Ok(())
 }
 
-fn process_pending(state: &Arc<Mutex<DaemonState>>) -> Result<(), String> {
+fn process_pending(state: &Arc<Mutex<DaemonState>>) -> Result<()> {
     let mut ready = vec![];
     {
         let mut s = state.lock().unwrap();
@@ -235,19 +242,17 @@ fn process_pending(state: &Arc<Mutex<DaemonState>>) -> Result<(), String> {
                 .stdout(std::process::Stdio::inherit())
                 .stderr(std::process::Stdio::inherit())
                 .status()
-                .map_err(|e| format!("build failed: {e}"))?;
+                .map_err(|e| BabyError::io(format!("run build command for {}", cfg.project), e))?;
 
             if !status.success() {
                 log::warn!("build failed for {}", cfg.project);
                 log_message(&format!("build failed for {}", cfg.project));
                 continue;
             }
-        } else {
-            if let Err(e) = build_and_install(&install_cfg) {
-                log::warn!("build failed for {}: {e}", cfg.project);
-                log_message(&format!("build failed for {}: {e}", cfg.project));
-                continue;
-            }
+        } else if let Err(e) = build_and_install(&install_cfg) {
+            log::warn!("build failed for {}: {e}", cfg.project);
+            log_message(&format!("build failed for {}: {e}", cfg.project));
+            continue;
         }
 
         if let Some(ref service) = cfg.restart {
