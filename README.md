@@ -1,7 +1,7 @@
 # baby
 
-**Build And Bin Yield** — build a Rust project in release mode and install the
-resulting binary with one command.
+**baby — Build And Bin Yield** — build a Rust project in release mode and install
+the resulting binary with one command.
 
 > Make building and installing Rust binaries effortless, observable, and repeatable.
 
