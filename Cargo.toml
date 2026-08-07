@@ -1,6 +1,6 @@
 [package]
 name = "baby"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2024"
 
 [dependencies]
@@ -9,10 +9,9 @@ notify = { version = "7", default-features = false, features = ["macos_fsevent"]
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 signal-hook = "0.3"
-chrono = "0.4"
+time = { version = "0.3", features = ["formatting", "macros"] }
 libc = "0.2"
-env_logger = "0.11"
-log = "0.4"
+log = { version = "0.4", features = ["std"] }
 clap_mangen = "0.2"
 anstyle = "1"
 
