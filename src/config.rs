@@ -89,7 +89,10 @@ impl ProjectConfig {
         if self.install.as_os_str().is_empty() {
             return Err(BabyError::new(
                 crate::error::ErrorKind::ConfigParse,
-                format!("project '{}' install directory must not be empty", self.project),
+                format!(
+                    "project '{}' install directory must not be empty",
+                    self.project
+                ),
             ));
         }
         Ok(())
@@ -183,7 +186,10 @@ watch = ["src"]
         assert_eq!(cfg.build, "cargo build --release");
         assert_eq!(cfg.install, PathBuf::from("/usr/local/bin"));
         assert_eq!(cfg.debounce_ms, 500);
-        assert_eq!(cfg.watch, vec![dir.path().join("src").to_string_lossy().to_string()]);
+        assert_eq!(
+            cfg.watch,
+            vec![dir.path().join("src").to_string_lossy().to_string()]
+        );
     }
 
     #[test]
@@ -253,5 +259,76 @@ user = true
         let map = path_to_project_map(&configs);
         assert_eq!(map.get(&PathBuf::from("src")), Some(&vec![0]));
         assert_eq!(map.get(&PathBuf::from("Cargo.toml")), Some(&vec![0]));
+    }
+
+    #[test]
+    fn validation_rejects_empty_project() {
+        let cfg = ProjectConfig {
+            project: "   ".into(),
+            watch: vec!["src".into()],
+            build: default_build(),
+            install: default_install(),
+            restart: None,
+            debounce_ms: default_debounce(),
+            strip: false,
+            backup: false,
+            sudo: false,
+            user: false,
+        };
+        let err = cfg.validate().unwrap_err();
+        assert_eq!(err.kind(), crate::error::ErrorKind::ConfigParse);
+    }
+
+    #[test]
+    fn validation_rejects_empty_watch() {
+        let cfg = ProjectConfig {
+            project: "demo".into(),
+            watch: vec![],
+            build: default_build(),
+            install: default_install(),
+            restart: None,
+            debounce_ms: default_debounce(),
+            strip: false,
+            backup: false,
+            sudo: false,
+            user: false,
+        };
+        let err = cfg.validate().unwrap_err();
+        assert_eq!(err.kind(), crate::error::ErrorKind::ConfigParse);
+    }
+
+    #[test]
+    fn validation_rejects_project_with_path_separator() {
+        let cfg = ProjectConfig {
+            project: "foo/bar".into(),
+            watch: vec!["src".into()],
+            build: default_build(),
+            install: default_install(),
+            restart: None,
+            debounce_ms: default_debounce(),
+            strip: false,
+            backup: false,
+            sudo: false,
+            user: false,
+        };
+        let err = cfg.validate().unwrap_err();
+        assert_eq!(err.kind(), crate::error::ErrorKind::ConfigParse);
+    }
+
+    #[test]
+    fn validation_accepts_valid_config() {
+        let cfg = ProjectConfig {
+            project: "demo".into(),
+            watch: vec!["src".into()],
+            build: default_build(),
+            install: default_install(),
+            restart: None,
+            debounce_ms: default_debounce(),
+            strip: false,
+            backup: false,
+            sudo: false,
+            user: false,
+        };
+        assert!(cfg.validate().is_ok());
     }
 }
