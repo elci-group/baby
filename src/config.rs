@@ -44,10 +44,10 @@ pub fn load_all_configs() -> Vec<(PathBuf, ProjectConfig)> {
 
     // Current directory .birth.toml
     let local = PathBuf::from(".birth.toml");
-    if local.exists() {
-        if let Ok(cfg) = load_config_file(&local) {
-            configs.push((local, cfg));
-        }
+    if local.exists()
+        && let Ok(cfg) = load_config_file(&local)
+    {
+        configs.push((local, cfg));
     }
 
     // XDG and system directories
@@ -56,10 +56,10 @@ pub fn load_all_configs() -> Vec<(PathBuf, ProjectConfig)> {
         if let Ok(entries) = fs::read_dir(&dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.extension().and_then(|s| s.to_str()) == Some("toml") {
-                    if let Ok(cfg) = load_config_file(&path) {
-                        configs.push((path, cfg));
-                    }
+                if path.extension().and_then(|s| s.to_str()) == Some("toml")
+                    && let Ok(cfg) = load_config_file(&path)
+                {
+                    configs.push((path, cfg));
                 }
             }
         }
