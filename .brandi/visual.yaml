@@ -1,0 +1,14 @@
+palette:
+  primary: "#FF2DAA"
+  secondary: ["#FF78C8", "#DCA7FF", "#FF4D6D", "#FFB020", "#58D5FF"]
+  neutrals: ["#FFF7FC", "#160812", "#6F5B68"]
+color_tolerance: 24
+typography:
+  style: technical_modern
+  preferred_fonts: []
+assets:
+  social_card: { width: 1200, height: 630 }
+  thumbnail: { width: 1280, height: 720 }
+  min_whitespace: 0.25
+  max_file_kb: 500
+  coherence_min_palette: 50
