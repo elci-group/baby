@@ -21,6 +21,9 @@ Examples:
   baby --run -- --help      # pass --help to the installed binary
   baby --dry-run            # preview what would be done
   baby --recipe .baby.toml  # use an explicit versioned installation recipe
+  baby update               # check for updates (--stable by default)
+  baby update --nightly     # check for nightly builds
+  baby update --bleeding    # check for bleeding edge builds
 "#;
 
 /// BABY — Build And Bin Yield
@@ -31,6 +34,9 @@ Examples:
 #[command(long_about = LONG_ABOUT)]
 #[command(styles = baby::styles::cli())]
 struct Args {
+    #[command(subcommand)]
+    command: Option<Command>,
+
     /// Build, install, then execute the binary
     #[arg(long)]
     run: bool,
@@ -84,6 +90,24 @@ struct Args {
     generate_man: Option<PathBuf>,
 }
 
+#[derive(Parser, Debug)]
+enum Command {
+    /// Check for available updates
+    Update {
+        /// Check against nightly builds
+        #[arg(long, group = "channel")]
+        nightly: bool,
+
+        /// Check against bleeding edge builds
+        #[arg(long, group = "channel")]
+        bleeding: bool,
+
+        /// Check against stable releases (default)
+        #[arg(long, group = "channel")]
+        stable: bool,
+    },
+}
+
 fn main() {
     setup_logging();
     if let Err(e) = run() {
@@ -100,6 +124,10 @@ fn run() -> Result<()> {
         baby::generate_man(&cmd, &path)?;
         log::info!("man page written to {}", path.display());
         return Ok(());
+    }
+
+    if let Some(cmd) = args.command {
+        return handle_command(cmd);
     }
 
     let config = InstallConfig {
@@ -143,4 +171,24 @@ fn run() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn handle_command(cmd: Command) -> Result<()> {
+    match cmd {
+        Command::Update {
+            nightly,
+            bleeding,
+            stable,
+        } => {
+            let channel = if bleeding {
+                baby::versioning::Channel::Bleeding
+            } else if nightly {
+                baby::versioning::Channel::Nightly
+            } else {
+                baby::versioning::Channel::Stable
+            };
+            baby::check_for_updates(channel)?;
+            Ok(())
+        }
+    }
 }

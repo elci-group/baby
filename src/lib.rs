@@ -5,6 +5,8 @@ pub mod config;
 pub mod error;
 pub mod logger;
 pub mod recipe;
+pub mod versioning;
+pub mod workspace;
 
 pub mod styles {
     //! Styling helpers for CLI output.
@@ -197,9 +199,24 @@ pub fn resolve_install_recipe(config: &InstallConfig) -> Result<(recipe::Install
 
     let cargo_manifest = cwd.join("Cargo.toml");
     if cargo_manifest.is_file() {
-        return Ok((
-            recipe::InstallRecipe::from_cargo_manifest(&cargo_manifest)?,
-            cwd,
+        // Try single package first
+        if let Ok(recipe) = recipe::InstallRecipe::from_cargo_manifest(&cargo_manifest) {
+            return Ok((recipe, cwd));
+        }
+
+        // If that fails, try workspace detection
+        if let Ok(binary_crate_manifest) = workspace::find_binary_crate_in_workspace(&cargo_manifest) {
+            let recipe = recipe::InstallRecipe::from_cargo_manifest(&binary_crate_manifest)?;
+            return Ok((recipe, cwd));
+        }
+
+        // If both fail, report the original error
+        return Err(BabyError::new(
+            crate::error::ErrorKind::RecipeInvalid,
+            format!(
+                "{} is a workspace with no suitable binary crate, or has no [package].name",
+                cargo_manifest.display()
+            ),
         ));
     }
 
@@ -489,6 +506,157 @@ pub fn run_binary(path: &Path, args: &[String]) -> Result<()> {
         .map_err(|e| BabyError::io(format!("run {}", path.display()), e))?;
 
     std::process::exit(status.code().unwrap_or(1));
+}
+
+/// Check for available updates from GitHub releases.
+///
+/// Fetches the latest release information for the given channel (stable, nightly, or bleeding)
+/// from the GitHub repository and compares with the currently installed version.
+pub fn check_for_updates(channel: versioning::Channel) -> Result<()> {
+    let current = versioning::Version::current();
+    let latest = fetch_latest_version(channel)?;
+
+    let channel_name = match channel {
+        versioning::Channel::Stable => "stable",
+        versioning::Channel::Nightly => "nightly",
+        versioning::Channel::Bleeding => "bleeding",
+    };
+
+    println!("Current version: {}", current);
+    println!("Latest {} version: {}", channel_name, latest);
+
+    match current.cmp(&latest) {
+        std::cmp::Ordering::Less => {
+            println!(
+                "\nUpdate available! A newer version ({}) is available.",
+                latest
+            );
+        }
+        std::cmp::Ordering::Equal => {
+            println!("\nYou are running the latest {} version.", channel_name);
+        }
+        std::cmp::Ordering::Greater => {
+            println!(
+                "\nYou are running a newer version ({}) than the latest {} release ({})",
+                current, channel_name, latest
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn fetch_latest_version(channel: versioning::Channel) -> Result<versioning::Version> {
+    let repo = "elci-group/baby";
+    let url = match channel {
+        versioning::Channel::Stable => {
+            format!("https://api.github.com/repos/{}/releases/latest", repo)
+        }
+        versioning::Channel::Nightly => {
+            format!(
+                "https://api.github.com/repos/{}/releases?per_page=50",
+                repo
+            )
+        }
+        versioning::Channel::Bleeding => {
+            format!(
+                "https://api.github.com/repos/{}/releases?per_page=50",
+                repo
+            )
+        }
+    };
+
+    let output = Command::new("curl")
+        .arg("-s")
+        .arg(&url)
+        .output()
+        .map_err(|e| BabyError::io("fetch latest version", e))?;
+
+    if !output.status.success() {
+        return Err(BabyError::new(
+            crate::error::ErrorKind::VersionCheck,
+            format!(
+                "failed to fetch version information from GitHub: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ),
+        ));
+    }
+
+    let response = String::from_utf8(output.stdout).map_err(|e| {
+        BabyError::new(
+            crate::error::ErrorKind::VersionCheck,
+            format!("invalid UTF-8 in GitHub response: {}", e),
+        )
+    })?;
+
+    parse_version_from_github_response(&response, channel)
+}
+
+fn parse_version_from_github_response(
+    response: &str,
+    channel: versioning::Channel,
+) -> Result<versioning::Version> {
+    // Simple JSON parsing for GitHub API responses
+    // Extract tag_name field(s) from the response
+    let versions: Vec<versioning::Version> = response
+        .lines()
+        .filter(|line| line.contains("\"tag_name\""))
+        .filter_map(|line| {
+            let start = line.find('"').map(|i| i + 1)?;
+            let end = line[start..].find('"')?;
+            let tag = &line[start..start + end];
+            versioning::Version::parse(tag).ok()
+        })
+        .collect();
+
+    if versions.is_empty() {
+        return Err(BabyError::new(
+            crate::error::ErrorKind::VersionCheck,
+            "no valid releases found for the selected channel".to_string(),
+        ));
+    }
+
+    let latest = match channel {
+        versioning::Channel::Stable => {
+            versions
+                .into_iter()
+                .filter(|v| v.prerelease.is_none())
+                .max()
+                .ok_or_else(|| {
+                    BabyError::new(
+                        crate::error::ErrorKind::VersionCheck,
+                        "no stable releases found".to_string(),
+                    )
+                })?
+        }
+        versioning::Channel::Nightly => {
+            versions
+                .into_iter()
+                .filter(|v| {
+                    v.prerelease
+                        .as_ref()
+                        .map(|p| p.contains("nightly"))
+                        .unwrap_or(false)
+                })
+                .max()
+                .ok_or_else(|| {
+                    BabyError::new(
+                        crate::error::ErrorKind::VersionCheck,
+                        "no nightly releases found".to_string(),
+                    )
+                })?
+        }
+        versioning::Channel::Bleeding => {
+            versions.into_iter().max().ok_or_else(|| {
+                BabyError::new(
+                    crate::error::ErrorKind::VersionCheck,
+                    "no releases found".to_string(),
+                )
+            })?
+        }
+    };
+
+    Ok(latest)
 }
 
 #[cfg(test)]

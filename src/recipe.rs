@@ -116,11 +116,22 @@ impl InstallRecipe {
                 )
             })?
             .to_string();
-        let manifest = path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("Cargo.toml")
-            .to_string();
+
+        // Use relative path from workspace root to manifest
+        let manifest_path = if let Some(parent) = path.parent() {
+            if let Ok(cwd) = std::env::current_dir() {
+                if let Ok(rel_path) = path.strip_prefix(&cwd) {
+                    rel_path.to_string_lossy().to_string()
+                } else {
+                    path.to_string_lossy().to_string()
+                }
+            } else {
+                path.to_string_lossy().to_string()
+            }
+        } else {
+            "Cargo.toml".to_string()
+        };
+
         Ok(Self {
             schema: RECIPE_SCHEMA.to_string(),
             build_system: BuildSystem::Cargo,
@@ -130,7 +141,7 @@ impl InstallRecipe {
                 "build".into(),
                 "--release".into(),
                 "--manifest-path".into(),
-                manifest,
+                manifest_path,
                 "--bin".into(),
                 binary.clone(),
             ]],

@@ -32,6 +32,8 @@ pub enum ErrorKind {
     Daemon,
     /// Filesystem watching failed.
     Watch,
+    /// Version checking failed.
+    VersionCheck,
 }
 
 impl fmt::Display for ErrorKind {
@@ -67,6 +69,7 @@ impl fmt::Display for ErrorKind {
             }
             ErrorKind::Daemon => write!(f, "daemon error; check the logs and restart birthd"),
             ErrorKind::Watch => write!(f, "watch error; check the watch path and restart birthd"),
+            ErrorKind::VersionCheck => write!(f, "version check error; ensure curl is installed and you have internet connectivity"),
         }
     }
 }
