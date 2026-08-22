@@ -1,3 +1,6 @@
+// Copyright (c) 2026 sal
+// SPDX-License-Identifier: MIT
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;

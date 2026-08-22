@@ -1,3 +1,6 @@
+// Copyright (c) 2026 sal
+// SPDX-License-Identifier: MIT
+
 use baby::config::{ProjectConfig, load_all_configs, path_to_project_map};
 use baby::error::{BabyError, Result};
 use baby::{InstallConfig, build_and_install};

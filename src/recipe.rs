@@ -1,3 +1,6 @@
+// Copyright (c) 2026 sal
+// SPDX-License-Identifier: MIT
+
 //! Versioned installation recipes.
 
 use std::fs;

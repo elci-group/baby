@@ -1,3 +1,6 @@
+// Copyright (c) 2026 sal
+// SPDX-License-Identifier: MIT
+
 //! Structured error types for `baby`.
 //!
 //! All library code returns [`BabyError`] via the [`Result`] alias. Binaries

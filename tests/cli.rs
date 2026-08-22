@@ -1,3 +1,6 @@
+// Copyright (c) 2026 sal
+// SPDX-License-Identifier: MIT
+
 use assert_cmd::Command;
 use predicates::prelude::*;
 use std::fs;

@@ -1,3 +1,6 @@
+// Copyright (c) 2026 sal
+// SPDX-License-Identifier: MIT
+
 //! A tiny `log` implementation that replaces `env_logger`.
 //!
 //! `setup_logging` targets stderr; `setup_daemon_logging` writes to stderr and

@@ -1,3 +1,6 @@
+// Copyright (c) 2026 sal
+// SPDX-License-Identifier: MIT
+
 use baby::error::Result;
 use baby::{InstallConfig, build_and_install, run_binary, setup_logging};
 use clap::Parser;

@@ -1,3 +1,6 @@
+// Copyright (c) 2026 sal
+// SPDX-License-Identifier: MIT
+
 pub mod config;
 pub mod error;
 pub mod logger;
