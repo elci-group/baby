@@ -6,7 +6,7 @@ use std::path::PathBuf;
 const LONG_ABOUT: &str = r#"
 BABY — Build And Bin Yield
 
-Build a Rust project in release mode and install the resulting binary.
+Build a project from a validated installation recipe and install its binary.
 
 By default the binary is installed to /usr/local/bin. Use --user to install
 to ~/.local/bin instead, or --install-dir for a custom location.
@@ -17,13 +17,14 @@ Examples:
   baby --run                # build + install + execute
   baby --run -- --help      # pass --help to the installed binary
   baby --dry-run            # preview what would be done
+  baby --recipe .baby.toml  # use an explicit versioned installation recipe
 "#;
 
 /// BABY — Build And Bin Yield
 #[derive(Parser, Debug)]
 #[command(name = "baby")]
 #[command(version)]
-#[command(about = "Build a Rust project and install the release binary")]
+#[command(about = "Build a project from a recipe and install its binary")]
 #[command(long_about = LONG_ABOUT)]
 #[command(styles = baby::styles::cli())]
 struct Args {
@@ -63,6 +64,14 @@ struct Args {
     #[arg(long)]
     install_dir: Option<PathBuf>,
 
+    /// Versioned installation recipe (default: .baby.toml, then Cargo.toml)
+    #[arg(long)]
+    recipe: Option<PathBuf>,
+
+    /// Validate and print the resolved recipe without executing it
+    #[arg(long)]
+    check_recipe: bool,
+
     /// Pass additional arguments when running with --run
     #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
     run_args: Vec<String>,
@@ -99,12 +108,26 @@ fn run() -> Result<()> {
         dry_run: args.dry_run,
         target_dir: args.target_dir,
         install_dir: args.install_dir,
+        recipe: args.recipe,
     };
+
+    if args.check_recipe {
+        let (recipe, root) = baby::resolve_install_recipe(&config)?;
+        println!(
+            "{} {:?} {} {}",
+            recipe.schema,
+            recipe.build_system,
+            recipe.binary,
+            root.join(recipe.artifact).display()
+        );
+        return Ok(());
+    }
 
     build_and_install(&config)?;
 
     if args.run {
-        let project = baby::infer_project_name()?;
+        let (recipe, _) = baby::resolve_install_recipe(&config)?;
+        let project = recipe.binary;
         let install_dir = if let Some(ref dir) = config.install_dir {
             dir.clone()
         } else if config.user {

@@ -1,6 +1,7 @@
 pub mod config;
 pub mod error;
 pub mod logger;
+pub mod recipe;
 
 pub mod styles {
     //! Styling helpers for CLI output.
@@ -78,6 +79,8 @@ pub struct InstallConfig {
     pub target_dir: Option<PathBuf>,
     /// Override the installation directory.
     pub install_dir: Option<PathBuf>,
+    /// Explicit versioned installation recipe.
+    pub recipe: Option<PathBuf>,
 }
 
 /// Infer the project name from the current working directory's final component.
@@ -177,19 +180,65 @@ pub fn is_process_alive(pid: u32) -> bool {
     unsafe { libc::kill(pid as i32, 0) == 0 }
 }
 
-/// Build the current project in release mode and install the resulting binary.
-pub fn build_and_install(config: &InstallConfig) -> Result<()> {
-    let project = infer_project_name()?;
-    log::info!("project inferred as: {project}");
-
-    let release_dir = config
-        .target_dir
+/// Resolve and validate an installation recipe without executing it.
+pub fn resolve_install_recipe(config: &InstallConfig) -> Result<(recipe::InstallRecipe, PathBuf)> {
+    let cwd = env::current_dir().map_err(|e| BabyError::io("get current directory", e))?;
+    let recipe_path = config
+        .recipe
         .clone()
-        .unwrap_or_else(|| PathBuf::from("target/release"));
-    let binary_path = release_dir.join(&project);
+        .unwrap_or_else(|| cwd.join(".baby.toml"));
+    if recipe_path.is_file() {
+        let root = recipe_path.parent().unwrap_or(&cwd).to_path_buf();
+        return Ok((recipe::InstallRecipe::load(&recipe_path)?, root));
+    }
+
+    let cargo_manifest = cwd.join("Cargo.toml");
+    if cargo_manifest.is_file() {
+        return Ok((
+            recipe::InstallRecipe::from_cargo_manifest(&cargo_manifest)?,
+            cwd,
+        ));
+    }
+
+    Err(BabyError::new(
+        crate::error::ErrorKind::RecipeInvalid,
+        format!(
+            "no installation recipe found in {}; add .baby.toml (schema {}) or a Cargo.toml with [package].name",
+            cwd.display(),
+            recipe::RECIPE_SCHEMA
+        ),
+    ))
+}
+
+/// Build according to a validated recipe and install its declared artifact.
+pub fn build_and_install(config: &InstallConfig) -> Result<()> {
+    let (mut recipe, root) = resolve_install_recipe(config)?;
+    let project = recipe.binary.clone();
+    log::info!(
+        "installation recipe resolved: schema={} build_system={:?} binary={project}",
+        recipe.schema,
+        recipe.build_system
+    );
+
+    if let Some(target_dir) = &config.target_dir {
+        if recipe.build_system != recipe::BuildSystem::Cargo {
+            return Err(BabyError::new(
+                crate::error::ErrorKind::RecipeInvalid,
+                "--target-dir is only valid for Cargo recipes",
+            ));
+        }
+        recipe.artifact = target_dir.join(&project);
+        for command in &mut recipe.commands {
+            if command.first().map(String::as_str) == Some("cargo") {
+                command.push("--target-dir".into());
+                command.push(target_dir.display().to_string());
+            }
+        }
+    }
+    let binary_path = root.join(&recipe.artifact);
     log::debug!(
-        "release dir: {release_dir}, binary path: {binary_path}",
-        release_dir = release_dir.display(),
+        "recipe root: {root}, binary path: {binary_path}",
+        root = root.display(),
         binary_path = binary_path.display()
     );
 
@@ -208,7 +257,17 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
         install_path = install_path.display()
     );
 
-    cargo_build_release(config, &release_dir)?;
+    run_recipe_commands(config, &recipe, &root)?;
+
+    if !config.dry_run && !binary_path.is_file() {
+        return Err(BabyError::new(
+            crate::error::ErrorKind::RecipeInvalid,
+            format!(
+                "recipe completed but expected artifact {} was not produced",
+                binary_path.display()
+            ),
+        ));
+    }
 
     if config.strip {
         strip_binary(config, &binary_path)?;
@@ -237,28 +296,30 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
     Ok(())
 }
 
-fn cargo_build_release(config: &InstallConfig, target_dir: &Path) -> Result<()> {
-    let mut cmd = Command::new("cargo");
-    cmd.arg("build").arg("--release");
-    if target_dir != Path::new("target/release") {
-        cmd.arg("--target-dir").arg(target_dir);
-    }
-
-    log::debug!("cargo build command: {}", format_command(&cmd));
-
-    if config.dry_run {
-        log::info!("[dry-run] would run: {}", format_command(&cmd));
-        return Ok(());
-    }
-
-    let status = cmd
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .status()
-        .map_err(|e| BabyError::io("run cargo build", e))?;
-
-    if !status.success() {
-        return Err(BabyError::command_failed("cargo build", status.code()));
+fn run_recipe_commands(
+    config: &InstallConfig,
+    recipe: &recipe::InstallRecipe,
+    root: &Path,
+) -> Result<()> {
+    for argv in &recipe.commands {
+        let mut cmd = Command::new(&argv[0]);
+        cmd.args(&argv[1..]).current_dir(root);
+        log::debug!("recipe command: {}", format_command(&cmd));
+        if config.dry_run {
+            log::info!("[dry-run] would run: {}", format_command(&cmd));
+            continue;
+        }
+        let status = cmd
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .status()
+            .map_err(|e| BabyError::io(format!("run recipe command {}", argv[0]), e))?;
+        if !status.success() {
+            return Err(BabyError::command_failed(
+                format_command(&cmd),
+                status.code(),
+            ));
+        }
     }
     Ok(())
 }
@@ -506,6 +567,7 @@ mod tests {
         assert!(!cfg.dry_run);
         assert!(cfg.target_dir.is_none());
         assert!(cfg.install_dir.is_none());
+        assert!(cfg.recipe.is_none());
     }
 
     #[test]

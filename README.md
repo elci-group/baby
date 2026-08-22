@@ -1,7 +1,7 @@
 # baby
 
-**baby — Build And Bin Yield** — build a Rust project in release mode and install
-the resulting binary with one command.
+**baby — Build And Bin Yield** — validate a project's installation recipe,
+build it, and install the resulting binary with one command.
 
 > Make building and installing Rust binaries effortless, observable, and repeatable.
 
@@ -49,6 +49,38 @@ birthd &
 Now every change to `src/` or `Cargo.toml` triggers a rebuild and install.
 
 ## Configuration
+
+### Installation recipes
+
+Baby resolves installation metadata in this order:
+
+1. An explicit `--recipe <PATH>`.
+2. `.baby.toml` in the current project.
+3. A compatibility recipe derived from `[package].name` in `Cargo.toml`.
+
+Directory names are never used as binary names. Non-Cargo repositories must
+provide a versioned recipe, so repository discovery cannot silently turn into
+the wrong build command. Recipe resolution and validation happen before any
+command executes.
+
+```toml
+schema = "baby.install/v1"
+build_system = "npm" # cargo, npm, python, binary-release, or script
+binary = "my-cli"
+artifact = "dist/my-cli"
+commands = [
+  ["npm", "ci"],
+  ["npm", "run", "build"],
+]
+```
+
+`artifact` must be repository-relative and cannot contain `..`. Each command
+is an argument array, so it is executed directly without a shell. A
+`binary-release` recipe may omit `commands` when the artifact is already
+present. Use `baby --check-recipe` to validate and print the resolved recipe
+without compiling or installing.
+
+### Watch configuration
 
 `birthd` discovers `.birth.toml` files in three places:
 
@@ -101,6 +133,8 @@ baby [OPTIONS] [RUN_ARGS]
 | `--dry-run` | Show what would happen without mutating the filesystem. |
 | `--target-dir <DIR>` | Override the Cargo target directory. |
 | `--install-dir <DIR>` | Override the installation directory. |
+| `--recipe <PATH>` | Use an explicit `baby.install/v1` recipe. |
+| `--check-recipe` | Validate and print the recipe without executing it. |
 
 ### `birthctl`
 

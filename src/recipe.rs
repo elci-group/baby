@@ -44,7 +44,10 @@ impl InstallRecipe {
         if self.schema != RECIPE_SCHEMA {
             return Err(BabyError::new(
                 ErrorKind::RecipeInvalid,
-                format!("unsupported recipe schema {:?}; expected {RECIPE_SCHEMA:?}", self.schema),
+                format!(
+                    "unsupported recipe schema {:?}; expected {RECIPE_SCHEMA:?}",
+                    self.schema
+                ),
             ));
         }
         if self.binary.trim().is_empty() || self.binary.contains(['/', '\\']) {
@@ -54,7 +57,10 @@ impl InstallRecipe {
             ));
         }
         if self.artifact.is_absolute()
-            || self.artifact.components().any(|c| matches!(c, Component::ParentDir))
+            || self
+                .artifact
+                .components()
+                .any(|c| matches!(c, Component::ParentDir))
         {
             return Err(BabyError::new(
                 ErrorKind::RecipeInvalid,
@@ -64,7 +70,10 @@ impl InstallRecipe {
         if self.build_system != BuildSystem::BinaryRelease && self.commands.is_empty() {
             return Err(BabyError::new(
                 ErrorKind::RecipeInvalid,
-                format!("{:?} recipe must declare at least one command", self.build_system),
+                format!(
+                    "{:?} recipe must declare at least one command",
+                    self.build_system
+                ),
             ));
         }
         if self
@@ -163,7 +172,11 @@ mod tests {
     fn cargo_fallback_uses_package_name_not_directory_name() {
         let dir = tempfile::tempdir().unwrap();
         let manifest = dir.path().join("Cargo.toml");
-        fs::write(&manifest, "[package]\nname = \"actual-bin\"\nversion = \"0.1.0\"\n").unwrap();
+        fs::write(
+            &manifest,
+            "[package]\nname = \"actual-bin\"\nversion = \"0.1.0\"\n",
+        )
+        .unwrap();
         let recipe = InstallRecipe::from_cargo_manifest(&manifest).unwrap();
         assert_eq!(recipe.binary, "actual-bin");
         assert_eq!(recipe.artifact, PathBuf::from("target/release/actual-bin"));

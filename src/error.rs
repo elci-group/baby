@@ -45,7 +45,10 @@ impl fmt::Display for ErrorKind {
                 write!(f, "config parse error; check the file syntax and retry")
             }
             ErrorKind::RecipeInvalid => {
-                write!(f, "installation recipe is invalid; fix .baby.toml and retry")
+                write!(
+                    f,
+                    "installation recipe is invalid; fix .baby.toml and retry"
+                )
             }
             ErrorKind::ProjectNameInference => write!(
                 f,

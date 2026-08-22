@@ -39,7 +39,8 @@ edition = "2021"
     cmd.current_dir(&project_dir).arg("--dry-run").arg("--user");
     cmd.assert()
         .success()
-        .stderr(predicate::str::contains("project inferred as: dummy"));
+        .stderr(predicate::str::contains("installation recipe resolved:"))
+        .stderr(predicate::str::contains("binary=dummy"));
 }
 
 #[test]

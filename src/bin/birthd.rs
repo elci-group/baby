@@ -226,6 +226,7 @@ fn process_pending(state: &Arc<Mutex<DaemonState>>) -> Result<()> {
             dry_run: false,
             target_dir: None,
             install_dir: Some(cfg.install.clone()),
+            recipe: None,
         };
 
         // Run the custom build command if it differs from the default
