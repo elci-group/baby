@@ -15,6 +15,8 @@ pub enum ErrorKind {
     CommandFailed,
     /// A configuration file could not be parsed.
     ConfigParse,
+    /// An installation recipe is unsupported or inconsistent.
+    RecipeInvalid,
     /// The project name could not be inferred from the current directory.
     ProjectNameInference,
     /// The `HOME` environment variable is required but missing.
@@ -41,6 +43,9 @@ impl fmt::Display for ErrorKind {
             }
             ErrorKind::ConfigParse => {
                 write!(f, "config parse error; check the file syntax and retry")
+            }
+            ErrorKind::RecipeInvalid => {
+                write!(f, "installation recipe is invalid; fix .baby.toml and retry")
             }
             ErrorKind::ProjectNameInference => write!(
                 f,
