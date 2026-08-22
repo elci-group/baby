@@ -52,7 +52,7 @@ Now every change to `src/` or `Cargo.toml` triggers a rebuild and install.
 
 ### Installation recipes
 
-Baby resolves installation metadata in this order:
+baby resolves installation metadata in this order:
 
 1. An explicit `--recipe <PATH>`.
 2. `.baby.toml` in the current project.
