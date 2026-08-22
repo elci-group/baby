@@ -1,15 +1,15 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
-.TH baby 1  "baby 0.2.11" 
+.TH baby 1  "baby 0.3.2" 
 .SH NAME
-baby \- Build a Rust project and install the release binary
+baby \- Build a project from a recipe and install its binary
 .SH SYNOPSIS
-\fBbaby\fR [\fB\-\-run\fR] [\fB\-\-strip\fR] [\fB\-\-backup\fR] [\fB\-\-service\fR] [\fB\-\-sudo\fR] [\fB\-\-user\fR] [\fB\-\-dry\-run\fR] [\fB\-\-target\-dir\fR] [\fB\-\-install\-dir\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] [\fIRUN_ARGS\fR] 
+\fBbaby\fR [\fB\-\-run\fR] [\fB\-\-strip\fR] [\fB\-\-backup\fR] [\fB\-\-service\fR] [\fB\-\-sudo\fR] [\fB\-\-user\fR] [\fB\-\-dry\-run\fR] [\fB\-\-target\-dir\fR] [\fB\-\-install\-dir\fR] [\fB\-\-recipe\fR] [\fB\-\-check\-recipe\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] [\fIRUN_ARGS\fR] 
 .SH DESCRIPTION
 .PP
 BABY — Build And Bin Yield
 .PP
-Build a Rust project in release mode and install the resulting binary.
+Build a project from a validated installation recipe and install its binary.
 .PP
 By default the binary is installed to /usr/local/bin. Use \-\-user to install
 to ~/.local/bin instead, or \-\-install\-dir for a custom location.
@@ -20,6 +20,7 @@ Examples:
   baby \-\-run                # build + install + execute
   baby \-\-run \-\- \-\-help      # pass \-\-help to the installed binary
   baby \-\-dry\-run            # preview what would be done
+  baby \-\-recipe .baby.toml  # use an explicit versioned installation recipe
 .SH OPTIONS
 .TP
 \fB\-\-run\fR
@@ -49,6 +50,12 @@ Custom target directory (default: target/release)
 \fB\-\-install\-dir\fR \fI<INSTALL_DIR>\fR
 Custom install directory (overrides \-\-user)
 .TP
+\fB\-\-recipe\fR \fI<RECIPE>\fR
+Versioned installation recipe (default: .baby.toml, then Cargo.toml)
+.TP
+\fB\-\-check\-recipe\fR
+Validate and print the resolved recipe without executing it
+.TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help (see a summary with \*(Aq\-h\*(Aq)
 .TP
@@ -58,4 +65,4 @@ Print version
 [\fIRUN_ARGS\fR]
 Pass additional arguments when running with \-\-run
 .SH VERSION
-v0.2.11
+v0.3.2

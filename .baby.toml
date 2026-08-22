@@ -1,0 +1,5 @@
+schema = "baby.install/v1"
+build_system = "cargo"
+binary = "baby"
+artifact = "target/release/baby"
+commands = [["cargo", "build", "--release", "--bin", "baby"]]
