@@ -1,6 +1,6 @@
 [package]
 name = "baby"
-version = "0.4.31"
+version = "0.4.32"
 edition = "2024"
 description = "Build projects from validated installation recipes and install their declared binaries."
 license = "MIT"
@@ -17,7 +17,7 @@ libc = "0.2"
 log = { version = "0.4", features = ["std"] }
 clap_mangen = "0.2"
 anstyle = "1"
-tokio = { version = "1", features = ["rt", "macros"] }
+tokio = { version = "1", features = ["rt", "macros", "rt-multi-thread"] }
 rayon = "1.8"
 tabled = "0.15"
 chrono = "0.4"

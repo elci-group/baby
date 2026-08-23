@@ -6,6 +6,7 @@ pub mod config;
 pub mod discovery;
 pub mod detection;
 pub mod execution;
+pub mod interactive;
 
 pub use types::*;
 

@@ -24,6 +24,8 @@ Examples:
   baby update               # check for updates (--stable by default)
   baby update --nightly     # check for nightly builds
   baby update --bleeding    # check for bleeding edge builds
+  baby boom                 # discover and update all managed tools
+  baby boom --interactive   # select which tools to update interactively
 "#;
 
 /// BABY — Build And Bin Yield
@@ -106,17 +108,40 @@ enum Command {
         #[arg(long, group = "channel")]
         stable: bool,
     },
+    /// Discover and update all managed tools in parallel
+    Boom {
+        /// Show what would be updated without executing
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Automatically confirm all updates
+        #[arg(long)]
+        yes: bool,
+
+        /// Interactively select which tools to update
+        #[arg(long)]
+        interactive: bool,
+
+        /// Number of parallel workers (default: 4)
+        #[arg(long)]
+        parallelism: Option<usize>,
+
+        /// Only update specific tools (comma-separated)
+        #[arg(long)]
+        filter: Option<String>,
+    },
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     setup_logging();
-    if let Err(e) = run() {
+    if let Err(e) = run().await {
         log::error!("{e}");
         std::process::exit(1);
     }
 }
 
-fn run() -> Result<()> {
+async fn run() -> Result<()> {
     let args = Args::parse();
 
     if let Some(path) = args.generate_man {
@@ -127,7 +152,7 @@ fn run() -> Result<()> {
     }
 
     if let Some(cmd) = args.command {
-        return handle_command(cmd);
+        return handle_command(cmd).await;
     }
 
     let config = InstallConfig {
@@ -173,7 +198,7 @@ fn run() -> Result<()> {
     Ok(())
 }
 
-fn handle_command(cmd: Command) -> Result<()> {
+async fn handle_command(cmd: Command) -> Result<()> {
     match cmd {
         Command::Update {
             nightly,
@@ -189,6 +214,16 @@ fn handle_command(cmd: Command) -> Result<()> {
             };
             baby::check_for_updates(channel)?;
             Ok(())
+        }
+        Command::Boom {
+            dry_run,
+            yes,
+            interactive,
+            parallelism,
+            filter,
+        } => {
+            let filter_vec = filter.map(|f| f.split(',').map(|s| s.trim().to_string()).collect());
+            baby::boom::run_boom(dry_run, yes, interactive, parallelism, filter_vec).await
         }
     }
 }
