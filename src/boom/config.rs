@@ -5,7 +5,7 @@ use crate::error::{BabyError, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use super::types::{BoomConfig, Channel, ToolDeclaration};
+use super::types::{BoomConfig, Channel};
 
 pub fn parse_boom_config(path: &Path) -> Result<BoomConfig> {
     let content = fs::read_to_string(path)
@@ -20,10 +20,9 @@ pub fn find_boom_config(root: &Path) -> Option<PathBuf> {
         return Some(local);
     }
 
-    let config_home = dirs::config_dir()?;
-    let global = config_home.join("boom").join("boom.toml");
-    if global.exists() {
-        return Some(global);
+    let config_dir = crate::xdg_config_dir().join("boom").join("boom.toml");
+    if config_dir.exists() {
+        return Some(config_dir);
     }
 
     None
