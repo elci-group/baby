@@ -617,21 +617,19 @@ fn parse_version_from_github_response(
     }
 
     let latest = match channel {
-        versioning::Channel::Stable => {
-            versions
-                .into_iter()
-                .filter(|v| v.prerelease.is_none())
-                .max()
-                .ok_or_else(|| {
-                    BabyError::new(
-                        crate::error::ErrorKind::VersionCheck,
-                        "no stable releases found".to_string(),
-                    )
-                })?
-        }
+        versioning::Channel::Stable => versions
+            .into_iter()
+            .filter(|v| v.prerelease.is_none())
+            .max()
+            .ok_or_else(|| {
+                BabyError::new(
+                    crate::error::ErrorKind::VersionCheck,
+                    "no stable releases found".to_string(),
+                )
+            })?,
         versioning::Channel::Nightly => {
-            versions
-                .into_iter()
+            let nightly_max = versions
+                .iter()
                 .filter(|v| {
                     v.prerelease
                         .as_ref()
@@ -639,21 +637,22 @@ fn parse_version_from_github_response(
                         .unwrap_or(false)
                 })
                 .max()
+                .cloned();
+            nightly_max
+                .or_else(|| versions.into_iter().max())
                 .ok_or_else(|| {
                     BabyError::new(
                         crate::error::ErrorKind::VersionCheck,
-                        "no nightly releases found".to_string(),
+                        "no releases found".to_string(),
                     )
                 })?
         }
-        versioning::Channel::Bleeding => {
-            versions.into_iter().max().ok_or_else(|| {
-                BabyError::new(
-                    crate::error::ErrorKind::VersionCheck,
-                    "no releases found".to_string(),
-                )
-            })?
-        }
+        versioning::Channel::Bleeding => versions.into_iter().max().ok_or_else(|| {
+            BabyError::new(
+                crate::error::ErrorKind::VersionCheck,
+                "no releases found".to_string(),
+            )
+        })?,
     };
 
     Ok(latest)
