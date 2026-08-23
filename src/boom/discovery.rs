@@ -26,7 +26,7 @@ pub async fn discover_tools(root: &Path) -> Result<Vec<Tool>> {
                 boom_config.boom.as_ref().and_then(|b| b.channel.as_deref()),
             );
 
-            let mut tool = Tool::new(
+            let tool = Tool::new(
                 decl.name.clone(),
                 decl.repo.clone(),
                 DiscoverySource::ConfigExplicit,
