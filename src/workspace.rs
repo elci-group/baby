@@ -131,12 +131,20 @@ fn crate_binary_name(manifest: &Path) -> Result<String> {
     let value: toml::Value = toml::from_str(&text)
         .map_err(|e| BabyError::config_parse(manifest.display().to_string(), e))?;
 
-    // Prefer explicit [[bin]] name
-    if let Some(bins) = value.get("bin").and_then(toml::Value::as_array) {
-        if let Some(first_bin) = bins.first() {
-            if let Some(name) = first_bin.get("name").and_then(toml::Value::as_str) {
-                return Ok(name.to_string());
+    // Check for explicit [[bin]] section with a name
+    // In TOML, [[bin]] becomes an array of tables under the "bin" key
+    if let Some(bins) = value.get("bin") {
+        // If it's an array, get the first entry
+        if let Some(arr) = bins.as_array() {
+            if let Some(first_bin) = arr.first() {
+                if let Some(name) = first_bin.get("name").and_then(toml::Value::as_str) {
+                    return Ok(name.to_string());
+                }
             }
+        }
+        // If it's a single table (shouldn't happen with [[bin]]), try to extract name
+        else if let Some(name) = bins.get("name").and_then(toml::Value::as_str) {
+            return Ok(name.to_string());
         }
     }
 
