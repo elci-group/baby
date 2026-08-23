@@ -30,8 +30,10 @@ pub mod styles {
     }
 }
 
+use std::collections::BTreeSet;
 use std::env;
 use std::fs;
+use std::io::{self, IsTerminal, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -205,7 +207,9 @@ pub fn resolve_install_recipe(config: &InstallConfig) -> Result<(recipe::Install
         }
 
         // If that fails, try workspace detection
-        if let Ok(binary_crate_manifest) = workspace::find_binary_crate_in_workspace(&cargo_manifest) {
+        if let Ok(binary_crate_manifest) =
+            workspace::find_binary_crate_in_workspace(&cargo_manifest)
+        {
             let recipe = recipe::InstallRecipe::from_cargo_manifest(&binary_crate_manifest)?;
             return Ok((recipe, cwd));
         }
@@ -279,6 +283,8 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
 
     run_recipe_commands(config, &recipe, &root)?;
 
+    install_ticker("🧱", "build complete; inspecting existing binaries");
+
     if !config.dry_run && !binary_path.is_file() {
         return Err(BabyError::new(
             crate::error::ErrorKind::RecipeInvalid,
@@ -290,8 +296,11 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
     }
 
     if config.strip {
+        install_ticker("✂️", "stripping symbols");
         strip_binary(config, &binary_path)?;
     }
+
+    inspect_existing_binary(config, &project, &binary_path, &install_path)?;
 
     ensure_install_dir(config, &install_dir)?;
 
@@ -300,6 +309,11 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
     }
 
     install_binary(config, &binary_path, &install_path)?;
+
+    install_ticker(
+        "✅",
+        &format!("installed {project} → {}", install_path.display()),
+    );
 
     if config.service {
         restart_systemd_service(config, &project)?;
@@ -314,6 +328,104 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn install_ticker(emoji: &str, message: &str) {
+    // Keep each stage to one concise, scannable line. The emoji acts as the
+    // animation/ticker beat without corrupting logs or non-interactive output.
+    log::info!("{emoji} · {message}");
+}
+
+fn paths_for_binary(name: &str) -> Vec<PathBuf> {
+    let mut seen = BTreeSet::new();
+    let mut paths = Vec::new();
+    for dir in env::var_os("PATH")
+        .as_deref()
+        .map(env::split_paths)
+        .into_iter()
+        .flatten()
+    {
+        let path = dir.join(name);
+        if path.is_file() && seen.insert(path.clone()) {
+            paths.push(path);
+        }
+    }
+    paths
+}
+
+fn binary_version(path: &Path) -> Option<versioning::Version> {
+    let output = Command::new(path).arg("--version").output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    String::from_utf8_lossy(&output.stdout)
+        .split_whitespace()
+        .find_map(|word| {
+            versioning::Version::parse(
+                word.trim_matches(|c: char| !c.is_ascii_alphanumeric() && c != '.' && c != '-'),
+            )
+            .ok()
+        })
+}
+
+fn inspect_existing_binary(
+    config: &InstallConfig,
+    name: &str,
+    built: &Path,
+    install_path: &Path,
+) -> Result<()> {
+    let existing = paths_for_binary(name);
+    if existing.is_empty() {
+        install_ticker("🆕", &format!("no existing `{name}` found in PATH"));
+    } else {
+        for path in &existing {
+            let version = binary_version(path)
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "unknown".into());
+            log::info!("🔎 · existing `{name}`: {version} ({})", path.display());
+        }
+    }
+
+    if config.dry_run || !install_path.exists() {
+        return Ok(());
+    }
+
+    let Some(old) = binary_version(install_path) else {
+        log::warn!("⚠️  · existing install has no readable --version; proceeding");
+        return Ok(());
+    };
+    let Some(new) = binary_version(built) else {
+        log::warn!("⚠️  · built binary has no readable --version; proceeding");
+        return Ok(());
+    };
+    log::info!("📦 · built version: {new}  |  installed version: {old}");
+    if new >= old {
+        return Ok(());
+    }
+
+    log::warn!("🚨 · regression detected: {new} is older than {old}");
+    if !io::stdin().is_terminal() {
+        log::warn!(
+            "⚠️  · non-interactive install; continuing (use --backup to preserve the old binary)"
+        );
+        return Ok(());
+    }
+    print!("❓ Install the older version anyway? [y/N] ");
+    io::stdout()
+        .flush()
+        .map_err(|e| BabyError::io("flush confirmation prompt", e))?;
+    let mut answer = String::new();
+    io::stdin()
+        .read_line(&mut answer)
+        .map_err(|e| BabyError::io("read confirmation", e))?;
+    if answer.trim().eq_ignore_ascii_case("y") || answer.trim().eq_ignore_ascii_case("yes") {
+        Ok(())
+    } else {
+        Err(BabyError::new(
+            crate::error::ErrorKind::RecipeInvalid,
+            "installation cancelled after version regression",
+        ))
+    }
 }
 
 fn run_recipe_commands(
@@ -553,16 +665,10 @@ fn fetch_latest_version(channel: versioning::Channel) -> Result<versioning::Vers
             format!("https://api.github.com/repos/{}/releases/latest", repo)
         }
         versioning::Channel::Nightly => {
-            format!(
-                "https://api.github.com/repos/{}/releases?per_page=50",
-                repo
-            )
+            format!("https://api.github.com/repos/{}/releases?per_page=50", repo)
         }
         versioning::Channel::Bleeding => {
-            format!(
-                "https://api.github.com/repos/{}/releases?per_page=50",
-                repo
-            )
+            format!("https://api.github.com/repos/{}/releases?per_page=50", repo)
         }
     };
 

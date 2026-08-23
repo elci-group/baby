@@ -18,32 +18,40 @@ pub fn find_binary_crate_in_workspace(manifest: &Path) -> Result<PathBuf> {
     // Check if this is a workspace
     let workspace = match value.get("workspace") {
         Some(ws) => ws,
-        None => return Err(BabyError::new(
-            crate::error::ErrorKind::RecipeInvalid,
-            format!("{} is not a workspace", manifest.display()),
-        )),
+        None => {
+            return Err(BabyError::new(
+                crate::error::ErrorKind::RecipeInvalid,
+                format!("{} is not a workspace", manifest.display()),
+            ));
+        }
     };
 
     // Get workspace members
     let members = match workspace.get("members") {
-        Some(m) => m.as_array().ok_or_else(|| BabyError::new(
-            crate::error::ErrorKind::RecipeInvalid,
-            "workspace.members must be an array".to_string(),
-        ))?,
-        None => return Err(BabyError::new(
-            crate::error::ErrorKind::RecipeInvalid,
-            "workspace has no members".to_string(),
-        )),
+        Some(m) => m.as_array().ok_or_else(|| {
+            BabyError::new(
+                crate::error::ErrorKind::RecipeInvalid,
+                "workspace.members must be an array".to_string(),
+            )
+        })?,
+        None => {
+            return Err(BabyError::new(
+                crate::error::ErrorKind::RecipeInvalid,
+                "workspace has no members".to_string(),
+            ));
+        }
     };
 
     let root_dir = manifest.parent().unwrap_or_else(|| Path::new("."));
     let mut binary_crates = Vec::new();
 
     for member in members {
-        let member_path = member.as_str().ok_or_else(|| BabyError::new(
-            crate::error::ErrorKind::RecipeInvalid,
-            "workspace member must be a string".to_string(),
-        ))?;
+        let member_path = member.as_str().ok_or_else(|| {
+            BabyError::new(
+                crate::error::ErrorKind::RecipeInvalid,
+                "workspace member must be a string".to_string(),
+            )
+        })?;
 
         let crate_manifest = root_dir.join(member_path).join("Cargo.toml");
         if !crate_manifest.is_file() {

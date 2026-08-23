@@ -129,7 +129,8 @@ impl InstallRecipe {
                     .and_then(toml::Value::as_str)
                     .map(|s| s.to_string())
             })
-        }.ok_or_else(|| {
+        }
+        .ok_or_else(|| {
             BabyError::new(
                 ErrorKind::RecipeInvalid,
                 format!("{} has no [package].name or [[bin]].name", path.display()),
