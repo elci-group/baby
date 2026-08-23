@@ -118,7 +118,7 @@ impl InstallRecipe {
             .to_string();
 
         // Use relative path from workspace root to manifest
-        let manifest_path = if let Some(parent) = path.parent() {
+        let manifest_path = if path.parent().is_some() {
             if let Ok(cwd) = std::env::current_dir() {
                 if let Ok(rel_path) = path.strip_prefix(&cwd) {
                     rel_path.to_string_lossy().to_string()
