@@ -5,6 +5,7 @@ pub mod types;
 pub mod config;
 pub mod discovery;
 pub mod detection;
+pub mod execution;
 
 pub use types::*;
 

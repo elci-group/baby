@@ -68,10 +68,12 @@ pub fn confirm_updates(updates: &[UpdateInfo]) -> Result<bool> {
         "Found {} tool(s) with updates. Proceed? [y/N] ",
         outdated_count
     );
-    io::stdout().flush()?;
+    io::stdout().flush()
+        .map_err(|e| BabyError::io("stdout flush", e))?;
 
     let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
+    io::stdin().read_line(&mut input)
+        .map_err(|e| BabyError::io("stdin read", e))?;
 
     Ok(input.trim().eq_ignore_ascii_case("y") || input.trim().eq_ignore_ascii_case("yes"))
 }
@@ -140,16 +142,11 @@ pub async fn execute_updates(plan: &ExecutionPlan) -> Result<ExecutionReport> {
 
 async fn build_and_install_tool(
     tool: &crate::boom::types::Tool,
-    plan: &ExecutionPlan,
+    _plan: &ExecutionPlan,
 ) -> Result<String> {
     log::info!("🔨 Building {}...", tool.name);
 
     let repo_url = &tool.repo;
-    let repo_name = repo_url
-        .split('/')
-        .last()
-        .and_then(|s| s.strip_suffix(".git"))
-        .unwrap_or("repo");
 
     let temp_dir = tempfile::tempdir()
         .map_err(|e| BabyError::io("create temp directory", e))?;
