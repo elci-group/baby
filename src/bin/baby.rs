@@ -178,7 +178,7 @@ fn handle_command(cmd: Command) -> Result<()> {
         Command::Update {
             nightly,
             bleeding,
-            stable,
+            stable: _,
         } => {
             let channel = if bleeding {
                 baby::versioning::Channel::Bleeding
