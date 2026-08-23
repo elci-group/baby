@@ -17,13 +17,12 @@ pub async fn detect_updates(tools: &[Tool], parallelism: usize) -> Result<Vec<Up
 
         if handles.len() >= parallelism {
             for handle in handles.drain(..) {
-                let result = handle.await.map_err(|e| {
+                let _ = handle.await.map_err(|e| {
                     BabyError::new(
                         crate::error::ErrorKind::ConfigParse,
                         format!("detection task failed: {}", e),
                     )
                 })??;
-                // results collected below
             }
         }
     }
