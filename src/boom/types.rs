@@ -3,7 +3,6 @@
 
 use crate::versioning::Version;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Channel {
