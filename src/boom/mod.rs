@@ -3,6 +3,7 @@
 
 pub mod types;
 pub mod config;
+pub mod discovery;
 
 pub use types::*;
 

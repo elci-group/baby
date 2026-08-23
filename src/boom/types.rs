@@ -75,7 +75,7 @@ pub struct ExecutionReport {
     pub total_duration_ms: u128,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Default)]
 pub struct BoomConfig {
     pub boom: Option<BoomSection>,
     pub tools: Option<Vec<ToolDeclaration>>,
