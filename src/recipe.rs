@@ -105,17 +105,36 @@ impl InstallRecipe {
             .map_err(|e| BabyError::io(format!("read Cargo manifest {}", path.display()), e))?;
         let value: toml::Value = toml::from_str(&text)
             .map_err(|e| BabyError::config_parse(path.display().to_string(), e))?;
-        let binary = value
-            .get("package")
-            .and_then(|package| package.get("name"))
-            .and_then(toml::Value::as_str)
-            .ok_or_else(|| {
-                BabyError::new(
-                    ErrorKind::RecipeInvalid,
-                    format!("{} has no [package].name", path.display()),
-                )
-            })?
-            .to_string();
+
+        // Prefer explicit [[bin]] name, fall back to package name
+        let binary = {
+            let mut bin_name = None;
+
+            // Check for explicit [[bin]] section with a name
+            if let Some(bins) = value.get("bin") {
+                if let Some(arr) = bins.as_array() {
+                    if let Some(first_bin) = arr.first() {
+                        if let Some(name) = first_bin.get("name").and_then(toml::Value::as_str) {
+                            bin_name = Some(name.to_string());
+                        }
+                    }
+                }
+            }
+
+            // Fall back to package name
+            bin_name.or_else(|| {
+                value
+                    .get("package")
+                    .and_then(|package| package.get("name"))
+                    .and_then(toml::Value::as_str)
+                    .map(|s| s.to_string())
+            })
+        }.ok_or_else(|| {
+            BabyError::new(
+                ErrorKind::RecipeInvalid,
+                format!("{} has no [package].name or [[bin]].name", path.display()),
+            )
+        })?;
 
         // Use relative path from workspace root to manifest
         let manifest_path = if path.parent().is_some() {
