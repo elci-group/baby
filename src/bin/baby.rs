@@ -110,6 +110,10 @@ enum Command {
     },
     /// Discover and update all managed tools in parallel
     Boom {
+        /// Initialize a new .boom.toml file
+        #[arg(long)]
+        init: bool,
+
         /// Show what would be updated without executing
         #[arg(long)]
         dry_run: bool,
@@ -216,12 +220,16 @@ async fn handle_command(cmd: Command) -> Result<()> {
             Ok(())
         }
         Command::Boom {
+            init,
             dry_run,
             yes,
             interactive,
             parallelism,
             filter,
         } => {
+            if init {
+                return baby::boom::init_boom_config().await;
+            }
             let filter_vec = filter.map(|f| f.split(',').map(|s| s.trim().to_string()).collect());
             baby::boom::run_boom(dry_run, yes, interactive, parallelism, filter_vec).await
         }
