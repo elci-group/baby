@@ -1,5 +1,4 @@
 use std::fs;
-use std::path::Path;
 
 fn main() {
     let path = std::env::args()
