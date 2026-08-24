@@ -15,6 +15,15 @@ fn baby_help_shows_usage() {
 }
 
 #[test]
+fn baby_help_documents_post_install_cleanup_override() {
+    let mut cmd = Command::cargo_bin("baby").unwrap();
+    cmd.arg("--help");
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("--no-clean"));
+}
+
+#[test]
 fn baby_version_prints_semver() {
     let mut cmd = Command::cargo_bin("baby").unwrap();
     cmd.arg("--version");

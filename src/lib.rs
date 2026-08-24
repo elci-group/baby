@@ -322,7 +322,7 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
         restart_systemd_service(config, &project)?;
     }
 
-    if recipe.build_system == recipe::BuildSystem::Cargo && !config.no_clean {
+    if recipe.build_system == recipe::BuildSystem::Cargo && !config.no_clean && !config.dry_run {
         clean_build_artifacts(config, &root, config.target_dir.as_deref())?;
     }
 
@@ -350,11 +350,6 @@ fn clean_build_artifacts(
         .arg("clean")
         .arg("--target-dir")
         .arg(&target_dir);
-
-    if config.dry_run {
-        log::info!("[dry-run] would run: {}", format_command(&cmd));
-        return Ok(());
-    }
 
     install_ticker(
         "🧹",
