@@ -6,6 +6,7 @@ pub mod config;
 pub mod error;
 pub mod logger;
 pub mod recipe;
+pub mod terminal_ui;
 pub mod versioning;
 pub mod workspace;
 
@@ -38,6 +39,7 @@ use std::io::{self, IsTerminal, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::time::Instant;
 
 use crate::error::{BabyError, Result};
 
@@ -239,6 +241,7 @@ pub fn resolve_install_recipe(config: &InstallConfig) -> Result<(recipe::Install
 
 /// Build according to a validated recipe and install its declared artifact.
 pub fn build_and_install(config: &InstallConfig) -> Result<()> {
+    let started_at = Instant::now();
     let (mut recipe, root) = resolve_install_recipe(config)?;
     let project = recipe.binary.clone();
     log::info!(
@@ -284,6 +287,8 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
         install_path = install_path.display()
     );
 
+    let mut animation = terminal_ui::InstallAnimation::start(&project, !config.dry_run);
+
     run_recipe_commands(config, &recipe, &root)?;
 
     install_ticker("🧱", "build complete; inspecting existing binaries");
@@ -322,7 +327,9 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
         restart_systemd_service(config, &project)?;
     }
 
-    if recipe.build_system == recipe::BuildSystem::Cargo && !config.no_clean && !config.dry_run {
+    let cleanup_ran =
+        recipe.build_system == recipe::BuildSystem::Cargo && !config.no_clean && !config.dry_run;
+    if cleanup_ran {
         clean_build_artifacts(&root, config.target_dir.as_deref())?;
     }
 
@@ -332,6 +339,21 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
             binary_path.display(),
             install_path.display()
         );
+    }
+
+    if let Some(animation) = animation.as_mut() {
+        let artifact_bytes = fs::metadata(&install_path)
+            .map(|metadata| metadata.len())
+            .unwrap_or(0);
+        animation.finish(&terminal_ui::InstallTelemetry {
+            project: &project,
+            install_path: &install_path,
+            elapsed: started_at.elapsed(),
+            build_commands: recipe.commands.len(),
+            artifact_bytes,
+            cleanup_ran,
+            dry_run: config.dry_run,
+        });
     }
 
     Ok(())

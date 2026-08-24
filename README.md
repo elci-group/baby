@@ -137,6 +137,12 @@ baby [OPTIONS] [RUN_ARGS]
 | `--recipe <PATH>` | Use an explicit `baby.install/v1` recipe. |
 | `--check-recipe` | Validate and print the recipe without executing it. |
 
+When stderr is an interactive terminal, `baby` shows a short crying-baby
+installation animation. On success the baby falls asleep to the right and a
+completion summary reports install path, elapsed time, build command count,
+installed artifact size, and cleanup status. Redirected output, CI, dry runs,
+and `birthd` logs remain non-animated.
+
 ### `birthctl`
 
 ```text
