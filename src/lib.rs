@@ -323,7 +323,7 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
     }
 
     if recipe.build_system == recipe::BuildSystem::Cargo && !config.no_clean && !config.dry_run {
-        clean_build_artifacts(config, &root, config.target_dir.as_deref())?;
+        clean_build_artifacts(&root, config.target_dir.as_deref())?;
     }
 
     if !config.dry_run {
@@ -338,7 +338,6 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
 }
 
 fn clean_build_artifacts(
-    config: &InstallConfig,
     root: &Path,
     target_dir: Option<&Path>,
 ) -> Result<()> {
