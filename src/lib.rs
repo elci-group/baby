@@ -337,10 +337,7 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
     Ok(())
 }
 
-fn clean_build_artifacts(
-    root: &Path,
-    target_dir: Option<&Path>,
-) -> Result<()> {
+fn clean_build_artifacts(root: &Path, target_dir: Option<&Path>) -> Result<()> {
     let target_dir = target_dir
         .map(PathBuf::from)
         .unwrap_or_else(|| root.join("target"));
