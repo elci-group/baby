@@ -72,20 +72,14 @@ fn detect_single_update(tool: &Tool) -> Result<UpdateInfo> {
 }
 
 fn get_installed_version(tool_name: &str) -> Option<Version> {
-    let output = Command::new("which")
-        .arg(tool_name)
-        .output()
-        .ok()?;
+    let output = Command::new("which").arg(tool_name).output().ok()?;
 
     if !output.status.success() {
         return None;
     }
 
     let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let version_output = Command::new(&path)
-        .arg("--version")
-        .output()
-        .ok()?;
+    let version_output = Command::new(&path).arg("--version").output().ok()?;
 
     if !version_output.status.success() {
         return None;

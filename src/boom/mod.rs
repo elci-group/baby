@@ -1,12 +1,12 @@
 // Copyright (c) 2026 sal
 // SPDX-License-Identifier: MIT
 
-pub mod types;
 pub mod config;
-pub mod discovery;
 pub mod detection;
+pub mod discovery;
 pub mod execution;
 pub mod interactive;
+pub mod types;
 
 pub use types::*;
 

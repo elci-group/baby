@@ -227,6 +227,7 @@ fn process_pending(state: &Arc<Mutex<DaemonState>>) -> Result<()> {
             sudo: cfg.sudo,
             user: cfg.user,
             dry_run: false,
+            no_clean: false,
             target_dir: None,
             install_dir: Some(cfg.install.clone()),
             recipe: None,

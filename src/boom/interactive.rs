@@ -43,11 +43,13 @@ pub fn select_updates_interactive(updates: &[UpdateInfo]) -> Result<Vec<usize>> 
                 current_version,
                 new_version
             );
-            io::stdout().flush()
+            io::stdout()
+                .flush()
                 .map_err(|e| crate::error::BabyError::io("stdout flush", e))?;
 
             let mut input = String::new();
-            io::stdin().read_line(&mut input)
+            io::stdin()
+                .read_line(&mut input)
                 .map_err(|e| crate::error::BabyError::io("stdin read", e))?;
 
             let choice = input.trim().to_lowercase();

@@ -53,10 +53,12 @@ fn scan_directory(dir: &Path, tools: &mut HashMap<(String, String), Tool>) -> Re
         return Ok(());
     }
 
-    let entries = fs::read_dir(dir).map_err(|e| crate::error::BabyError::io(dir.display().to_string(), e))?;
+    let entries =
+        fs::read_dir(dir).map_err(|e| crate::error::BabyError::io(dir.display().to_string(), e))?;
 
     for entry_result in entries {
-        let entry = entry_result.map_err(|e| crate::error::BabyError::io(dir.display().to_string(), e))?;
+        let entry =
+            entry_result.map_err(|e| crate::error::BabyError::io(dir.display().to_string(), e))?;
         let path = entry.path();
 
         if entry.file_name() == ".baby.toml" {
@@ -71,8 +73,9 @@ fn scan_directory(dir: &Path, tools: &mut HashMap<(String, String), Tool>) -> Re
 
                         let key = (tool_name.clone(), repo_url.clone());
                         if !tools.contains_key(&key) {
-                            let tool = Tool::new(tool_name, repo_url, DiscoverySource::FilesystemScanned)
-                                .with_channel(Some(Channel::Stable));
+                            let tool =
+                                Tool::new(tool_name, repo_url, DiscoverySource::FilesystemScanned)
+                                    .with_channel(Some(Channel::Stable));
                             tools.insert(key, tool);
                         }
                     }

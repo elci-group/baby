@@ -67,6 +67,10 @@ struct Args {
     #[arg(long)]
     dry_run: bool,
 
+    /// Keep build artefacts after installation
+    #[arg(long)]
+    no_clean: bool,
+
     /// Custom target directory (default: target/release)
     #[arg(long)]
     target_dir: Option<PathBuf>,
@@ -166,6 +170,7 @@ async fn run() -> Result<()> {
         sudo: args.sudo,
         user: args.user,
         dry_run: args.dry_run,
+        no_clean: args.no_clean,
         target_dir: args.target_dir,
         install_dir: args.install_dir,
         recipe: args.recipe,

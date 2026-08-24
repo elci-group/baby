@@ -159,9 +159,13 @@ mod tests {
 
     #[test]
     fn tool_builder() {
-        let tool = Tool::new("test".to_string(), "https://example.com/test.git".to_string(), DiscoverySource::ConfigExplicit)
-            .with_directory(Some("cmd".to_string()))
-            .with_channel(Some(Channel::Stable));
+        let tool = Tool::new(
+            "test".to_string(),
+            "https://example.com/test.git".to_string(),
+            DiscoverySource::ConfigExplicit,
+        )
+        .with_directory(Some("cmd".to_string()))
+        .with_channel(Some(Channel::Stable));
 
         assert_eq!(tool.name, "test");
         assert_eq!(tool.directory, Some("cmd".to_string()));
@@ -170,7 +174,11 @@ mod tests {
 
     #[test]
     fn update_info_status() {
-        let tool = Tool::new("test".to_string(), "https://example.com/test.git".to_string(), DiscoverySource::ConfigExplicit);
+        let tool = Tool::new(
+            "test".to_string(),
+            "https://example.com/test.git".to_string(),
+            DiscoverySource::ConfigExplicit,
+        );
         let update = UpdateInfo::new(tool);
         assert_eq!(update.status(), UpdateStatus::Error);
     }

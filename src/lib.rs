@@ -83,6 +83,8 @@ pub struct InstallConfig {
     pub user: bool,
     /// Show what would happen without mutating the filesystem.
     pub dry_run: bool,
+    /// Skip post-install cleanup of Cargo build artefacts.
+    pub no_clean: bool,
     /// Override the Cargo target directory.
     pub target_dir: Option<PathBuf>,
     /// Override the installation directory.
@@ -320,6 +322,10 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
         restart_systemd_service(config, &project)?;
     }
 
+    if recipe.build_system == recipe::BuildSystem::Cargo && !config.no_clean {
+        clean_build_artifacts(config, &root, config.target_dir.as_deref())?;
+    }
+
     if !config.dry_run {
         log::info!(
             "installed {} -> {}",
@@ -328,6 +334,41 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
         );
     }
 
+    Ok(())
+}
+
+fn clean_build_artifacts(
+    config: &InstallConfig,
+    root: &Path,
+    target_dir: Option<&Path>,
+) -> Result<()> {
+    let target_dir = target_dir
+        .map(PathBuf::from)
+        .unwrap_or_else(|| root.join("target"));
+    let mut cmd = Command::new("deckhand");
+    cmd.current_dir(root)
+        .arg("clean")
+        .arg("--target-dir")
+        .arg(&target_dir);
+
+    if config.dry_run {
+        log::info!("[dry-run] would run: {}", format_command(&cmd));
+        return Ok(());
+    }
+
+    install_ticker(
+        "🧹",
+        &format!("cleaning build artefacts in {}", target_dir.display()),
+    );
+    let status = cmd
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()
+        .map_err(|e| BabyError::io("run deckhand clean", e))?;
+    if !status.success() {
+        return Err(BabyError::command_failed("deckhand clean", status.code()));
+    }
+    log::info!("cleaned build artefacts in {}", target_dir.display());
     Ok(())
 }
 

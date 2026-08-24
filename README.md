@@ -131,6 +131,7 @@ baby [OPTIONS] [RUN_ARGS]
 | `--sudo` | Use `sudo` for privileged install operations. |
 | `--user` | Install to `~/.local/bin`. |
 | `--dry-run` | Show what would happen without mutating the filesystem. |
+| `--no-clean` | Keep Cargo build artefacts after installation. |
 | `--target-dir <DIR>` | Override the Cargo target directory. |
 | `--install-dir <DIR>` | Override the installation directory. |
 | `--recipe <PATH>` | Use an explicit `baby.install/v1` recipe. |

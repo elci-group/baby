@@ -68,11 +68,13 @@ pub fn confirm_updates(updates: &[UpdateInfo]) -> Result<bool> {
         "Found {} tool(s) with updates. Proceed? [y/N] ",
         outdated_count
     );
-    io::stdout().flush()
+    io::stdout()
+        .flush()
         .map_err(|e| BabyError::io("stdout flush", e))?;
 
     let mut input = String::new();
-    io::stdin().read_line(&mut input)
+    io::stdin()
+        .read_line(&mut input)
         .map_err(|e| BabyError::io("stdin read", e))?;
 
     Ok(input.trim().eq_ignore_ascii_case("y") || input.trim().eq_ignore_ascii_case("yes"))
@@ -148,8 +150,7 @@ async fn build_and_install_tool(
 
     let repo_url = &tool.repo;
 
-    let temp_dir = tempfile::tempdir()
-        .map_err(|e| BabyError::io("create temp directory", e))?;
+    let temp_dir = tempfile::tempdir().map_err(|e| BabyError::io("create temp directory", e))?;
 
     let clone_status = std::process::Command::new("git")
         .arg("clone")
@@ -190,7 +191,10 @@ pub fn show_execution_report(report: &ExecutionReport) -> Result<()> {
     println!("  Succeeded: {}", report.succeeded);
     println!("  Failed:    {}", report.failed);
     println!("  Skipped:   {}", report.skipped);
-    println!("  Duration:  {:.2}s\n", report.total_duration_ms as f64 / 1000.0);
+    println!(
+        "  Duration:  {:.2}s\n",
+        report.total_duration_ms as f64 / 1000.0
+    );
 
     for result in &report.results {
         let symbol = match result.status {
