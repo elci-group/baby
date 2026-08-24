@@ -1,0 +1,13 @@
+# Goglz Configuration for baby project documentation
+
+purpose: "Improve clarity, completeness, and technical accuracy of baby project documentation"
+
+directories:
+  - path: "."
+    file_patterns: ["README.md", "CONTRIBUTING.md", "CHANGELOG.md"]
+    recursive: false
+
+processing:
+  output_directory: "./docs_improved"
+  max_file_size_mb: 10
+  batch_size: 5
