@@ -197,10 +197,13 @@ impl InstallAnimation {
         self.stop();
 
         let mut block = String::new();
-        for row in SLEEP_FRAME {
+        for (i, row) in SLEEP_FRAME.iter().enumerate() {
             block.push_str("  ");
             render_pixel_row(row, &mut block);
-            block.push_str("  😴\n");
+            if i == 0 {
+                block.push_str("  😴 zzz");
+            }
+            block.push('\n');
         }
         let cleanup = if telemetry.cleanup_ran {
             "completed"
