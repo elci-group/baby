@@ -6,9 +6,9 @@
   ],
   "parent": "baby-dev@1.0.0",
   "created": "2026-08-07T20:57:48.520296513Z",
-  "last_verified": "2026-08-07",
-  "confidence": 0.7,
-  "status": "needs_validation",
+  "last_verified": "2026-08-26",
+  "confidence": 0.95,
+  "status": "active",
   "verified_app_version": "0.8.4",
   "mutation_history": [
     {
