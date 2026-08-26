@@ -1,32 +1,53 @@
 {
   "name": "baby-dev",
-  "skill_version": "1.0.0",
+  "skill_version": "1.1.0",
   "compatible_apps": [
     ">=0.1.0, <1.0.0"
   ],
+  "parent": "baby-dev@1.0.0",
   "created": "2026-08-07T20:57:48.520296513Z",
   "last_verified": "2026-08-07",
-  "confidence": 0.95,
-  "status": "active",
-  "verified_app_version": "0.1.4",
-  "mutation_history": [],
+  "confidence": 0.7,
+  "status": "needs_validation",
+  "verified_app_version": "0.8.4",
+  "mutation_history": [
+    {
+      "commit": "6eff700",
+      "reason": "migrate app 0.1.4 -> 0.8.4: +tokio",
+      "timestamp": "2026-08-26T14:56:40.633340384Z",
+      "from_app": "0.1.4",
+      "to_app": "0.8.4"
+    }
+  ],
   "context": {
-    "frameworks": [],
+    "frameworks": [
+      "tokio"
+    ],
     "toolchains": [],
     "directories": [
-      "src"
+      "docs",
+      "man",
+      "scripts",
+      "src",
+      "tests"
     ],
     "dependencies": {
       "anstyle": "1",
+      "assert_cmd": "2",
       "chrono": "0.4",
       "clap": "4",
       "clap_mangen": "0.2",
-      "env_logger": "0.11",
       "libc": "0.2",
       "log": "0.4",
       "notify": "7",
+      "num_cpus": "1",
+      "predicates": "3",
+      "rayon": "1.8",
       "serde": "1",
       "signal-hook": "0.3",
+      "tabled": "0.15",
+      "tempfile": "3",
+      "tokio": "1",
       "toml": "0.8"
     }
   },
