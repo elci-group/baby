@@ -91,6 +91,7 @@ fn pixel_color(ch: char) -> Option<(u8, u8, u8)> {
 }
 
 fn render_pixel_row(row: &str, out: &mut String) {
+    debug_assert_eq!(row.chars().count(), BABY_WIDTH, "malformed pixel-art row");
     for ch in row.chars() {
         match pixel_color(ch) {
             Some((r, g, b)) => {
@@ -124,7 +125,6 @@ pub struct InstallAnimation {
     paused: Arc<AtomicBool>,
     stage: Arc<Mutex<StageState>>,
     worker: Option<JoinHandle<()>>,
-    started: Instant,
 }
 
 impl InstallAnimation {
@@ -163,7 +163,6 @@ impl InstallAnimation {
             paused,
             stage,
             worker: Some(worker),
-            started,
         })
     }
 

@@ -292,9 +292,13 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
 
     let mut animation = terminal_ui::InstallAnimation::start(&project, !config.dry_run);
 
-    let outcome = run_recipe_commands(config, &recipe, &root)?;
+    let outcome = run_recipe_commands(config, animation.as_ref(), &recipe, &root)?;
 
-    install_ticker("🧱", "build complete; inspecting existing binaries");
+    install_ticker(
+        animation.as_ref(),
+        "🧱",
+        "build complete; inspecting existing binaries",
+    );
 
     let mut binary_path = expected_binary_path.clone();
     let mut boar_managed_target: Option<PathBuf> = None;
@@ -308,6 +312,7 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
         match relocated {
             Some(candidate) if candidate.is_file() => {
                 install_ticker(
+                    animation.as_ref(),
                     "🐗",
                     &format!(
                         "artifact recovered under boar-managed placement: {}",
@@ -342,11 +347,17 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
     }
 
     if config.strip {
-        install_ticker("✂️", "stripping symbols");
-        strip_binary(config, &binary_path)?;
+        install_ticker(animation.as_ref(), "✂️", "stripping symbols");
+        strip_binary(config, animation.as_ref(), &binary_path)?;
     }
 
-    inspect_existing_binary(config, &project, &binary_path, &install_path)?;
+    inspect_existing_binary(
+        config,
+        animation.as_ref(),
+        &project,
+        &binary_path,
+        &install_path,
+    )?;
 
     ensure_install_dir(config, &install_dir)?;
 
@@ -357,12 +368,13 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
     install_binary(config, &binary_path, &install_path)?;
 
     install_ticker(
+        animation.as_ref(),
         "✅",
         &format!("installed {project} → {}", install_path.display()),
     );
 
     if config.service {
-        restart_systemd_service(config, &project)?;
+        restart_systemd_service(config, animation.as_ref(), &project)?;
     }
 
     let cleanup_ran = recipe.build_system == recipe::BuildSystem::Cargo
@@ -370,9 +382,10 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
         && !config.dry_run
         && boar_managed_target.is_none();
     if cleanup_ran {
-        clean_build_artifacts(&root, config.target_dir.as_deref())?;
+        clean_build_artifacts(animation.as_ref(), &root, config.target_dir.as_deref())?;
     } else if boar_managed_target.is_some() {
         install_ticker(
+            animation.as_ref(),
             "🐗",
             "build artefacts remain under boar; run `boar clean` there if needed",
         );
@@ -404,7 +417,11 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
     Ok(())
 }
 
-fn clean_build_artifacts(root: &Path, target_dir: Option<&Path>) -> Result<()> {
+fn clean_build_artifacts(
+    animation: Option<&terminal_ui::InstallAnimation>,
+    root: &Path,
+    target_dir: Option<&Path>,
+) -> Result<()> {
     let target_dir = target_dir
         .map(PathBuf::from)
         .unwrap_or_else(|| root.join("target"));
@@ -415,14 +432,21 @@ fn clean_build_artifacts(root: &Path, target_dir: Option<&Path>) -> Result<()> {
         .arg(&target_dir);
 
     install_ticker(
+        animation,
         "🧹",
         &format!("cleaning build artefacts in {}", target_dir.display()),
     );
+    if let Some(a) = animation {
+        a.pause();
+    }
     let status = cmd
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .status()
         .map_err(|e| BabyError::io("run deckhand clean", e))?;
+    if let Some(a) = animation {
+        a.resume();
+    }
     if !status.success() {
         return Err(BabyError::command_failed("deckhand clean", status.code()));
     }
@@ -430,9 +454,15 @@ fn clean_build_artifacts(root: &Path, target_dir: Option<&Path>) -> Result<()> {
     Ok(())
 }
 
-fn install_ticker(emoji: &str, message: &str) {
-    // Keep each stage to one concise, scannable line. The emoji acts as the
-    // animation/ticker beat without corrupting logs or non-interactive output.
+/// Log one concise, scannable install-stage line and, when the animated
+/// baby is running, update its live stage/elapsed status too. The emoji
+/// acts as the ticker beat without corrupting logs or non-interactive
+/// output; `log::info!` itself erases any drawn animation frame first (see
+/// `logger::RENDER`), so this can never interleave with the art block.
+fn install_ticker(animation: Option<&terminal_ui::InstallAnimation>, emoji: &str, message: &str) {
+    if let Some(a) = animation {
+        a.set_stage(message);
+    }
     log::info!("{emoji} · {message}");
 }
 
@@ -470,13 +500,18 @@ fn binary_version(path: &Path) -> Option<versioning::Version> {
 
 fn inspect_existing_binary(
     config: &InstallConfig,
+    animation: Option<&terminal_ui::InstallAnimation>,
     name: &str,
     built: &Path,
     install_path: &Path,
 ) -> Result<()> {
     let existing = paths_for_binary(name);
     if existing.is_empty() {
-        install_ticker("🆕", &format!("no existing `{name}` found in PATH"));
+        install_ticker(
+            animation,
+            "🆕",
+            &format!("no existing `{name}` found in PATH"),
+        );
     } else {
         for path in &existing {
             let version = binary_version(path)
@@ -510,6 +545,9 @@ fn inspect_existing_binary(
         );
         return Ok(());
     }
+    if let Some(a) = animation {
+        a.pause();
+    }
     print!("❓ Install the older version anyway? [y/N] ");
     io::stdout()
         .flush()
@@ -518,6 +556,9 @@ fn inspect_existing_binary(
     io::stdin()
         .read_line(&mut answer)
         .map_err(|e| BabyError::io("read confirmation", e))?;
+    if let Some(a) = animation {
+        a.resume();
+    }
     if answer.trim().eq_ignore_ascii_case("y") || answer.trim().eq_ignore_ascii_case("yes") {
         Ok(())
     } else {
@@ -549,6 +590,7 @@ fn relocated_artifact_path(recipe_artifact: &Path, target_dir: &Path) -> Option<
 
 fn run_recipe_commands(
     config: &InstallConfig,
+    animation: Option<&terminal_ui::InstallAnimation>,
     recipe: &recipe::InstallRecipe,
     root: &Path,
 ) -> Result<BuildOutcome> {
@@ -556,20 +598,30 @@ fn run_recipe_commands(
     for argv in &recipe.commands {
         let mut cmd = Command::new(&argv[0]);
         cmd.args(&argv[1..]).current_dir(root);
-        log::debug!("recipe command: {}", format_command(&cmd));
         if config.dry_run {
             log::info!("[dry-run] would run: {}", format_command(&cmd));
             continue;
+        }
+        install_ticker(
+            animation,
+            "🔨",
+            &format!("running: {}", format_command(&cmd)),
+        );
+        if let Some(a) = animation {
+            a.pause();
         }
         let status = cmd
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
             .status()
             .map_err(|e| BabyError::io(format!("run recipe command {}", argv[0]), e))?;
+        if let Some(a) = animation {
+            a.resume();
+        }
         if status.success() {
             continue;
         }
-        if let Some(target_dir) = attempt_boar_recovery(config, recipe, root, argv)? {
+        if let Some(target_dir) = attempt_boar_recovery(config, animation, recipe, root, argv)? {
             outcome = BuildOutcome::Recovered { target_dir };
             continue;
         }
@@ -589,6 +641,7 @@ fn run_recipe_commands(
 /// while trying to invoke `boar` itself.
 fn attempt_boar_recovery(
     config: &InstallConfig,
+    animation: Option<&terminal_ui::InstallAnimation>,
     recipe: &recipe::InstallRecipe,
     root: &Path,
     argv: &[String],
@@ -607,17 +660,24 @@ fn attempt_boar_recovery(
     }
 
     install_ticker(
+        animation,
         "🐗",
         "local build storage under pressure; retrying via boar for adaptive placement",
     );
     let mut cmd = Command::new(&boar_argv[0]);
     cmd.args(&boar_argv[1..]).current_dir(root);
     log::debug!("boar recovery command: {}", format_command(&cmd));
+    if let Some(a) = animation {
+        a.pause();
+    }
     let status = cmd
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .status()
         .map_err(|e| BabyError::io("run boar recovery build", e))?;
+    if let Some(a) = animation {
+        a.resume();
+    }
     if !status.success() {
         log::warn!(
             "boar recovery build also failed (status {:?}); reporting the original failure",
@@ -625,11 +685,15 @@ fn attempt_boar_recovery(
         );
         return Ok(None);
     }
-    install_ticker("✅", "build recovered via boar");
+    install_ticker(animation, "✅", "build recovered via boar");
     Ok(Some(boar::resolved_target_dir(root)))
 }
 
-fn strip_binary(config: &InstallConfig, binary: &Path) -> Result<()> {
+fn strip_binary(
+    config: &InstallConfig,
+    animation: Option<&terminal_ui::InstallAnimation>,
+    binary: &Path,
+) -> Result<()> {
     let mut cmd = Command::new("strip");
     cmd.arg(binary);
 
@@ -640,11 +704,17 @@ fn strip_binary(config: &InstallConfig, binary: &Path) -> Result<()> {
         return Ok(());
     }
 
+    if let Some(a) = animation {
+        a.pause();
+    }
     let status = cmd
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .status()
         .map_err(|e| BabyError::io("run strip", e))?;
+    if let Some(a) = animation {
+        a.resume();
+    }
 
     if !status.success() {
         return Err(BabyError::command_failed("strip", status.code()));
@@ -728,7 +798,11 @@ fn install_binary(config: &InstallConfig, from: &Path, to: &Path) -> Result<()> 
     Ok(())
 }
 
-fn restart_systemd_service(config: &InstallConfig, project: &str) -> Result<()> {
+fn restart_systemd_service(
+    config: &InstallConfig,
+    animation: Option<&terminal_ui::InstallAnimation>,
+    project: &str,
+) -> Result<()> {
     let service_name = format!("{}.service", project);
     let mut cmd = Command::new("systemctl");
     cmd.arg("restart").arg(&service_name);
@@ -737,18 +811,27 @@ fn restart_systemd_service(config: &InstallConfig, project: &str) -> Result<()> 
         cmd = wrap_sudo(cmd);
     }
 
-    log::debug!("systemctl command: {}", format_command(&cmd));
-
     if config.dry_run {
         log::info!("[dry-run] would run: {}", format_command(&cmd));
         return Ok(());
     }
 
+    install_ticker(
+        animation,
+        "🔁",
+        &format!("running: {}", format_command(&cmd)),
+    );
+    if let Some(a) = animation {
+        a.pause();
+    }
     let status = cmd
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .status()
         .map_err(|e| BabyError::io("run systemctl", e))?;
+    if let Some(a) = animation {
+        a.resume();
+    }
 
     if !status.success() {
         return Err(BabyError::command_failed(
@@ -1048,7 +1131,10 @@ mod tests {
     fn relocated_artifact_path_none_for_non_standard_layout() {
         let recipe_artifact = PathBuf::from("dist/widget");
         let ram_target_dir = PathBuf::from("/dev/shm/boar/widget-abc123");
-        assert_eq!(relocated_artifact_path(&recipe_artifact, &ram_target_dir), None);
+        assert_eq!(
+            relocated_artifact_path(&recipe_artifact, &ram_target_dir),
+            None
+        );
     }
 
     #[test]
@@ -1065,13 +1151,8 @@ mod tests {
             commands: vec![vec!["cargo".into(), "build".into(), "--release".into()]],
         };
         let config = InstallConfig::default();
-        let result = attempt_boar_recovery(
-            &config,
-            &recipe,
-            dir.path(),
-            &recipe.commands[0],
-        )
-        .unwrap();
+        let result =
+            attempt_boar_recovery(&config, None, &recipe, dir.path(), &recipe.commands[0]).unwrap();
         assert!(result.is_none());
     }
 
@@ -1090,7 +1171,7 @@ mod tests {
             ..InstallConfig::default()
         };
         assert!(
-            attempt_boar_recovery(&config, &recipe, dir.path(), &recipe.commands[0])
+            attempt_boar_recovery(&config, None, &recipe, dir.path(), &recipe.commands[0])
                 .unwrap()
                 .is_none()
         );
@@ -1098,7 +1179,7 @@ mod tests {
         config.no_boar = false;
         config.target_dir = Some(PathBuf::from("/tmp/explicit-target"));
         assert!(
-            attempt_boar_recovery(&config, &recipe, dir.path(), &recipe.commands[0])
+            attempt_boar_recovery(&config, None, &recipe, dir.path(), &recipe.commands[0])
                 .unwrap()
                 .is_none()
         );
