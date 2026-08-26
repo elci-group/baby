@@ -298,34 +298,35 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
 
     let mut binary_path = expected_binary_path.clone();
     let mut boar_managed_target: Option<PathBuf> = None;
-    if let BuildOutcome::Recovered { target_dir } = &outcome {
-        if !config.dry_run && !binary_path.is_file() {
-            let relocated = target_dir
-                .as_deref()
-                .and_then(|dir| relocated_artifact_path(&recipe.artifact, dir));
-            match relocated {
-                Some(candidate) if candidate.is_file() => {
-                    install_ticker(
-                        "🐗",
-                        &format!(
-                            "artifact recovered under boar-managed placement: {}",
-                            candidate.display()
-                        ),
-                    );
-                    boar_managed_target = target_dir.clone();
-                    binary_path = candidate;
-                }
-                _ => {
-                    return Err(BabyError::new(
-                        crate::error::ErrorKind::RecipeInvalid,
-                        format!(
-                            "boar recovered the build, but the artifact could not be located \
-                             (expected {}); run `boar target-dir` to inspect placement or pass \
-                             --target-dir explicitly",
-                            expected_binary_path.display()
-                        ),
-                    ));
-                }
+    if let BuildOutcome::Recovered { target_dir } = &outcome
+        && !config.dry_run
+        && !binary_path.is_file()
+    {
+        let relocated = target_dir
+            .as_deref()
+            .and_then(|dir| relocated_artifact_path(&recipe.artifact, dir));
+        match relocated {
+            Some(candidate) if candidate.is_file() => {
+                install_ticker(
+                    "🐗",
+                    &format!(
+                        "artifact recovered under boar-managed placement: {}",
+                        candidate.display()
+                    ),
+                );
+                boar_managed_target = target_dir.clone();
+                binary_path = candidate;
+            }
+            _ => {
+                return Err(BabyError::new(
+                    crate::error::ErrorKind::RecipeInvalid,
+                    format!(
+                        "boar recovered the build, but the artifact could not be located \
+                         (expected {}); run `boar target-dir` to inspect placement or pass \
+                         --target-dir explicitly",
+                        expected_binary_path.display()
+                    ),
+                ));
             }
         }
     }
