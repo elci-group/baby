@@ -1,0 +1,3 @@
+skillastic daemon: watching /home/sal/baby every 300s
+[2026-08-26 16:14:11] change detected: app ? -> 0.8.4, head None -> Some("570e339")
+[2026-08-26 16:14:11] resolve baby-dev: load (skill verified for app 0.8.4)
