@@ -1,6 +1,7 @@
 // Copyright (c) 2026 sal
 // SPDX-License-Identifier: MIT
 
+pub mod boar;
 pub mod boom;
 pub mod config;
 pub mod error;
@@ -87,6 +88,8 @@ pub struct InstallConfig {
     pub dry_run: bool,
     /// Skip post-install cleanup of Cargo build artefacts.
     pub no_clean: bool,
+    /// Never delegate a failed build to `boar` for RAM/disk recovery.
+    pub no_boar: bool,
     /// Override the Cargo target directory.
     pub target_dir: Option<PathBuf>,
     /// Override the installation directory.
@@ -265,11 +268,11 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
             }
         }
     }
-    let binary_path = root.join(&recipe.artifact);
+    let expected_binary_path = root.join(&recipe.artifact);
     log::debug!(
         "recipe root: {root}, binary path: {binary_path}",
         root = root.display(),
-        binary_path = binary_path.display()
+        binary_path = expected_binary_path.display()
     );
 
     let install_dir = if let Some(ref dir) = config.install_dir {
@@ -289,9 +292,43 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
 
     let mut animation = terminal_ui::InstallAnimation::start(&project, !config.dry_run);
 
-    run_recipe_commands(config, &recipe, &root)?;
+    let outcome = run_recipe_commands(config, &recipe, &root)?;
 
     install_ticker("🧱", "build complete; inspecting existing binaries");
+
+    let mut binary_path = expected_binary_path.clone();
+    let mut boar_managed_target: Option<PathBuf> = None;
+    if let BuildOutcome::Recovered { target_dir } = &outcome {
+        if !config.dry_run && !binary_path.is_file() {
+            let relocated = target_dir
+                .as_deref()
+                .and_then(|dir| relocated_artifact_path(&recipe.artifact, dir));
+            match relocated {
+                Some(candidate) if candidate.is_file() => {
+                    install_ticker(
+                        "🐗",
+                        &format!(
+                            "artifact recovered under boar-managed placement: {}",
+                            candidate.display()
+                        ),
+                    );
+                    boar_managed_target = target_dir.clone();
+                    binary_path = candidate;
+                }
+                _ => {
+                    return Err(BabyError::new(
+                        crate::error::ErrorKind::RecipeInvalid,
+                        format!(
+                            "boar recovered the build, but the artifact could not be located \
+                             (expected {}); run `boar target-dir` to inspect placement or pass \
+                             --target-dir explicitly",
+                            expected_binary_path.display()
+                        ),
+                    ));
+                }
+            }
+        }
+    }
 
     if !config.dry_run && !binary_path.is_file() {
         return Err(BabyError::new(
@@ -327,10 +364,17 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
         restart_systemd_service(config, &project)?;
     }
 
-    let cleanup_ran =
-        recipe.build_system == recipe::BuildSystem::Cargo && !config.no_clean && !config.dry_run;
+    let cleanup_ran = recipe.build_system == recipe::BuildSystem::Cargo
+        && !config.no_clean
+        && !config.dry_run
+        && boar_managed_target.is_none();
     if cleanup_ran {
         clean_build_artifacts(&root, config.target_dir.as_deref())?;
+    } else if boar_managed_target.is_some() {
+        install_ticker(
+            "🐗",
+            "build artefacts remain under boar; run `boar clean` there if needed",
+        );
     }
 
     if !config.dry_run {
@@ -483,11 +527,31 @@ fn inspect_existing_binary(
     }
 }
 
+/// Outcome of running a recipe's build commands.
+enum BuildOutcome {
+    /// Every command succeeded on its first attempt.
+    Normal,
+    /// A retryable command failed and `boar` recovered it. `target_dir` is
+    /// where BOAR reports it placed the build, if that could be determined.
+    Recovered { target_dir: Option<PathBuf> },
+}
+
+/// Map a recipe artifact path (e.g. `target/release/widget`) onto a
+/// different target-dir root (e.g. a boar-managed RAM path), by keeping
+/// everything after the leading `target` component. Recipes with a
+/// differently named or nested artifact path can't be remapped this way and
+/// return `None`.
+fn relocated_artifact_path(recipe_artifact: &Path, target_dir: &Path) -> Option<PathBuf> {
+    let suffix = recipe_artifact.strip_prefix("target").ok()?;
+    Some(target_dir.join(suffix))
+}
+
 fn run_recipe_commands(
     config: &InstallConfig,
     recipe: &recipe::InstallRecipe,
     root: &Path,
-) -> Result<()> {
+) -> Result<BuildOutcome> {
+    let mut outcome = BuildOutcome::Normal;
     for argv in &recipe.commands {
         let mut cmd = Command::new(&argv[0]);
         cmd.args(&argv[1..]).current_dir(root);
@@ -501,14 +565,67 @@ fn run_recipe_commands(
             .stderr(Stdio::inherit())
             .status()
             .map_err(|e| BabyError::io(format!("run recipe command {}", argv[0]), e))?;
-        if !status.success() {
-            return Err(BabyError::command_failed(
-                format_command(&cmd),
-                status.code(),
-            ));
+        if status.success() {
+            continue;
         }
+        if let Some(target_dir) = attempt_boar_recovery(config, recipe, root, argv)? {
+            outcome = BuildOutcome::Recovered { target_dir };
+            continue;
+        }
+        return Err(BabyError::command_failed(
+            format_command(&cmd),
+            status.code(),
+        ));
     }
-    Ok(())
+    Ok(outcome)
+}
+
+/// Retry a failed, retryable Cargo command through `boar` when the failure
+/// looks plausibly storage-related. Returns `Ok(Some(target_dir))` on a
+/// successful recovery (BOAR's reported target dir, if resolvable),
+/// `Ok(None)` when recovery was not attempted or did not help (the caller
+/// should report the original failure), and `Err` only for I/O failures
+/// while trying to invoke `boar` itself.
+fn attempt_boar_recovery(
+    config: &InstallConfig,
+    recipe: &recipe::InstallRecipe,
+    root: &Path,
+    argv: &[String],
+) -> Result<Option<Option<PathBuf>>> {
+    if config.no_boar || config.target_dir.is_some() {
+        return Ok(None);
+    }
+    if recipe.build_system != recipe::BuildSystem::Cargo {
+        return Ok(None);
+    }
+    let Some(boar_argv) = boar::rewrite_for_boar(argv) else {
+        return Ok(None);
+    };
+    if !boar::boar_available() || !boar::plausibly_storage_related(root) {
+        return Ok(None);
+    }
+
+    install_ticker(
+        "🐗",
+        "local build storage under pressure; retrying via boar for adaptive placement",
+    );
+    let mut cmd = Command::new(&boar_argv[0]);
+    cmd.args(&boar_argv[1..]).current_dir(root);
+    log::debug!("boar recovery command: {}", format_command(&cmd));
+    let status = cmd
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()
+        .map_err(|e| BabyError::io("run boar recovery build", e))?;
+    if !status.success() {
+        log::warn!(
+            "boar recovery build also failed (status {:?}); reporting the original failure",
+            status.code()
+        );
+        return Ok(None);
+    }
+    install_ticker("✅", "build recovered via boar");
+    Ok(Some(boar::resolved_target_dir(root)))
 }
 
 fn strip_binary(config: &InstallConfig, binary: &Path) -> Result<()> {
@@ -896,6 +1013,7 @@ mod tests {
         assert!(!cfg.sudo);
         assert!(!cfg.user);
         assert!(!cfg.dry_run);
+        assert!(!cfg.no_boar);
         assert!(cfg.target_dir.is_none());
         assert!(cfg.install_dir.is_none());
         assert!(cfg.recipe.is_none());
@@ -913,5 +1031,75 @@ mod tests {
         let err = BabyError::command_failed("strip", Some(1));
         assert_eq!(err.kind(), ErrorKind::CommandFailed);
         assert!(err.message().contains("status 1"));
+    }
+
+    #[test]
+    fn relocated_artifact_path_remaps_target_prefix() {
+        let recipe_artifact = PathBuf::from("target/release/widget");
+        let ram_target_dir = PathBuf::from("/dev/shm/boar/widget-abc123");
+        assert_eq!(
+            relocated_artifact_path(&recipe_artifact, &ram_target_dir),
+            Some(PathBuf::from("/dev/shm/boar/widget-abc123/release/widget"))
+        );
+    }
+
+    #[test]
+    fn relocated_artifact_path_none_for_non_standard_layout() {
+        let recipe_artifact = PathBuf::from("dist/widget");
+        let ram_target_dir = PathBuf::from("/dev/shm/boar/widget-abc123");
+        assert_eq!(relocated_artifact_path(&recipe_artifact, &ram_target_dir), None);
+    }
+
+    #[test]
+    fn boar_recovery_is_not_attempted_without_storage_pressure() {
+        // A freshly created temp directory is never plausibly out of space,
+        // so recovery must not run cargo/boar at all here; `no_boar` alone
+        // is enough to prove the gate short-circuits before any subprocess.
+        let dir = tempfile::tempdir().unwrap();
+        let recipe = recipe::InstallRecipe {
+            schema: recipe::RECIPE_SCHEMA.to_string(),
+            build_system: recipe::BuildSystem::Cargo,
+            binary: "widget".into(),
+            artifact: PathBuf::from("target/release/widget"),
+            commands: vec![vec!["cargo".into(), "build".into(), "--release".into()]],
+        };
+        let config = InstallConfig::default();
+        let result = attempt_boar_recovery(
+            &config,
+            &recipe,
+            dir.path(),
+            &recipe.commands[0],
+        )
+        .unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn boar_recovery_is_skipped_when_disabled_or_target_dir_overridden() {
+        let dir = tempfile::tempdir().unwrap();
+        let recipe = recipe::InstallRecipe {
+            schema: recipe::RECIPE_SCHEMA.to_string(),
+            build_system: recipe::BuildSystem::Cargo,
+            binary: "widget".into(),
+            artifact: PathBuf::from("target/release/widget"),
+            commands: vec![vec!["cargo".into(), "build".into(), "--release".into()]],
+        };
+        let mut config = InstallConfig {
+            no_boar: true,
+            ..InstallConfig::default()
+        };
+        assert!(
+            attempt_boar_recovery(&config, &recipe, dir.path(), &recipe.commands[0])
+                .unwrap()
+                .is_none()
+        );
+
+        config.no_boar = false;
+        config.target_dir = Some(PathBuf::from("/tmp/explicit-target"));
+        assert!(
+            attempt_boar_recovery(&config, &recipe, dir.path(), &recipe.commands[0])
+                .unwrap()
+                .is_none()
+        );
     }
 }

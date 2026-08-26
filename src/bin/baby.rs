@@ -71,6 +71,10 @@ struct Args {
     #[arg(long)]
     no_clean: bool,
 
+    /// Never delegate a failed build to `boar` for RAM/disk recovery
+    #[arg(long)]
+    no_boar: bool,
+
     /// Custom target directory (default: target/release)
     #[arg(long)]
     target_dir: Option<PathBuf>,
@@ -171,6 +175,7 @@ async fn run() -> Result<()> {
         user: args.user,
         dry_run: args.dry_run,
         no_clean: args.no_clean,
+        no_boar: args.no_boar,
         target_dir: args.target_dir,
         install_dir: args.install_dir,
         recipe: args.recipe,
