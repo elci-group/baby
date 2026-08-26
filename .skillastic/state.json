@@ -1,9 +1,11 @@
 {
   "last_app_version": "0.8.4",
-  "last_head": "570e339",
-  "last_check": "2026-08-26T16:14:11.142500993Z",
+  "last_head": "a0996a1",
+  "last_check": "2026-08-26T16:24:11.914871006Z",
   "events": [
     "[2026-08-26 16:14:11] change detected: app ? -> 0.8.4, head None -> Some(\"570e339\")",
-    "[2026-08-26 16:14:11] resolve baby-dev: load (skill verified for app 0.8.4)"
+    "[2026-08-26 16:14:11] resolve baby-dev: load (skill verified for app 0.8.4)",
+    "[2026-08-26 16:19:11] change detected: app 0.8.4 -> 0.8.4, head Some(\"570e339\") -> Some(\"a0996a1\")",
+    "[2026-08-26 16:19:11] resolve baby-dev: load (skill verified for app 0.8.4)"
   ]
 }

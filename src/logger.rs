@@ -16,6 +16,31 @@ use log::{LevelFilter, Log, Metadata, Record};
 
 use crate::error::{BabyError, Result};
 
+/// Tracks how many lines of animated, in-place terminal output (the install
+/// baby's art block) currently sit at the cursor. Any log line must erase
+/// those lines first so a plain `log::info!` from a build thread can never
+/// land mid-frame and corrupt the animation (or vice versa) — without this,
+/// a background redraw and a log write racing for the same terminal lines
+/// is exactly what made prior install runs look garbled/stuck.
+pub(crate) struct RenderState {
+    pub(crate) drawn_lines: usize,
+}
+
+pub(crate) static RENDER: Mutex<RenderState> = Mutex::new(RenderState { drawn_lines: 0 });
+
+/// Erase `lines` previously-drawn lines and leave the cursor at column 0 of
+/// what was their first line, ready for a fresh draw or a plain log write.
+pub(crate) fn erase_drawn(out: &mut impl Write, lines: usize) {
+    if lines == 0 {
+        return;
+    }
+    let _ = write!(out, "\x1b[{lines}A");
+    for _ in 0..lines {
+        let _ = write!(out, "\x1b[2K\x1b[1B");
+    }
+    let _ = write!(out, "\x1b[{lines}A");
+}
+
 struct SimpleLogger {
     max_level: LevelFilter,
     file: Option<Mutex<File>>,
@@ -34,8 +59,14 @@ impl Log for SimpleLogger {
         let timestamp = format_timestamp(SystemTime::now());
         let line = format!("{} {:>5} {}\n", timestamp, record.level(), record.args());
 
-        // Stderr is unbuffered; ignore write failures.
-        let _ = io::stderr().write_all(line.as_bytes());
+        {
+            let mut render = RENDER.lock().unwrap_or_else(|e| e.into_inner());
+            let mut stderr = io::stderr();
+            erase_drawn(&mut stderr, render.drawn_lines);
+            render.drawn_lines = 0;
+            // Stderr is unbuffered; ignore write failures.
+            let _ = stderr.write_all(line.as_bytes());
+        }
 
         if let Some(ref file) = self.file
             && let Ok(mut file) = file.lock()
