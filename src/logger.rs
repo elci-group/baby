@@ -28,17 +28,37 @@ pub(crate) struct RenderState {
 
 pub(crate) static RENDER: Mutex<RenderState> = Mutex::new(RenderState { drawn_lines: 0 });
 
-/// Erase `lines` previously-drawn lines and leave the cursor at column 0 of
-/// what was their first line, ready for a fresh draw or a plain log write.
+/// Replace a previously drawn terminal block in one write.
+///
+/// Building the complete cursor movement, erasure, and replacement before
+/// touching the terminal prevents observers from seeing a half-cleared frame.
+/// Explicit carriage returns also make replacement independent of the cursor
+/// column left behind by another terminal writer.
+pub(crate) fn replace_drawn(out: &mut impl Write, lines: usize, replacement: &str) {
+    let mut update = String::with_capacity(replacement.len() + lines.saturating_mul(12));
+    if lines > 0 {
+        use std::fmt::Write as _;
+
+        update.push('\r');
+        let _ = write!(update, "\x1b[{lines}A");
+        for line in 0..lines {
+            update.push_str("\x1b[2K");
+            if line + 1 < lines {
+                update.push_str("\x1b[1B\r");
+            }
+        }
+        if lines > 1 {
+            let _ = write!(update, "\x1b[{}A", lines - 1);
+        }
+        update.push('\r');
+    }
+    update.push_str(replacement);
+    let _ = out.write_all(update.as_bytes());
+}
+
+/// Erase a previously drawn block while retaining the replacement invariant.
 pub(crate) fn erase_drawn(out: &mut impl Write, lines: usize) {
-    if lines == 0 {
-        return;
-    }
-    let _ = write!(out, "\x1b[{lines}A");
-    for _ in 0..lines {
-        let _ = write!(out, "\x1b[2K\x1b[1B");
-    }
-    let _ = write!(out, "\x1b[{lines}A");
+    replace_drawn(out, lines, "");
 }
 
 struct SimpleLogger {
@@ -62,10 +82,8 @@ impl Log for SimpleLogger {
         {
             let mut render = RENDER.lock().unwrap_or_else(|e| e.into_inner());
             let mut stderr = io::stderr();
-            erase_drawn(&mut stderr, render.drawn_lines);
+            replace_drawn(&mut stderr, render.drawn_lines, &line);
             render.drawn_lines = 0;
-            // Stderr is unbuffered; ignore write failures.
-            let _ = stderr.write_all(line.as_bytes());
         }
 
         if let Some(ref file) = self.file
@@ -190,6 +208,45 @@ pub fn setup_daemon_logging(log_path: &std::path::Path) -> Result<()> {
 mod tests {
     use super::*;
     use log::Level;
+
+    #[derive(Default)]
+    struct RecordingWriter {
+        bytes: Vec<u8>,
+        writes: usize,
+    }
+
+    impl Write for RecordingWriter {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            self.writes += 1;
+            self.bytes.extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn replacement_is_emitted_as_one_atomic_write() {
+        let mut out = RecordingWriter::default();
+        replace_drawn(&mut out, 3, "replacement\n");
+
+        assert_eq!(out.writes, 1);
+        assert_eq!(
+            String::from_utf8(out.bytes).unwrap(),
+            "\r\x1b[3A\x1b[2K\x1b[1B\r\x1b[2K\x1b[1B\r\x1b[2K\x1b[2A\rreplacement\n"
+        );
+    }
+
+    #[test]
+    fn replacement_without_a_previous_block_has_no_cursor_codes() {
+        let mut out = RecordingWriter::default();
+        replace_drawn(&mut out, 0, "plain\n");
+
+        assert_eq!(out.writes, 1);
+        assert_eq!(out.bytes, b"plain\n");
+    }
 
     #[test]
     fn parse_level_defaults_to_info() {

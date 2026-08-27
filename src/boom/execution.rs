@@ -2,21 +2,16 @@
 // SPDX-License-Identifier: MIT
 
 use crate::error::{BabyError, Result};
+use form3::table::{Table, TableStyle};
 use std::io::{self, Write};
 use std::time::Instant;
-use tabled::{Table, Tabled};
 
 use super::types::{ExecutionPlan, ExecutionReport, ExecutionResult, UpdateInfo, UpdateStatus};
 
-#[derive(Tabled)]
 struct DryRunRow {
-    #[tabled(rename = "Tool")]
     tool: String,
-    #[tabled(rename = "Installed")]
     installed: String,
-    #[tabled(rename = "Available")]
     available: String,
-    #[tabled(rename = "Action")]
     action: String,
 }
 
@@ -50,8 +45,22 @@ pub fn show_dry_run(updates: &[UpdateInfo]) -> Result<()> {
         });
     }
 
-    let table = Table::new(rows);
-    println!("\n{}\n", table);
+    let mut table = Table::new();
+    table.set_style(TableStyle::Ascii);
+    table.set_header(vec!["Tool", "Installed", "Available", "Action"]);
+    for row in &rows {
+        table.add_row(vec![
+            row.tool.clone(),
+            row.installed.clone(),
+            row.available.clone(),
+            row.action.clone(),
+        ]);
+    }
+    let mut rendered = table.to_string();
+    if rendered.ends_with('\n') {
+        rendered.pop();
+    }
+    println!("\n{}\n", rendered);
 
     Ok(())
 }

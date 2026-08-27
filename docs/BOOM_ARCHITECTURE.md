@@ -235,8 +235,8 @@ fn get_installed_version(tool_name: &str) -> Option<Version> {
 
 ```rust
 pub fn show_dry_run(updates: &[UpdateInfo]) -> Result<()> {
-    use tabled::Table;
-    
+    use form3::table::{Table, TableStyle};
+
     let rows: Vec<DryRunRow> = updates.iter()
         .map(|u| DryRunRow {
             tool: u.tool.name.clone(),
@@ -245,14 +245,19 @@ pub fn show_dry_run(updates: &[UpdateInfo]) -> Result<()> {
             action: if u.is_outdated { "Update" } else { "Current" },
         })
         .collect();
-    
-    let table = Table::new(rows);
+
+    let mut table = Table::new();
+    table.set_style(TableStyle::Ascii);
+    table.set_header(vec!["Tool", "Installed", "Available", "Action"]);
+    for row in &rows {
+        table.add_row(vec![row.tool.clone(), row.installed.clone(), row.available.clone(), row.action.clone()]);
+    }
     println!("{}", table);
     Ok(())
 }
 ```
 
-Uses `tabled` crate for automatic table formatting with borders.
+Uses `form3`'s dependency-free table renderer (ASCII grid style) for automatic table formatting with borders.
 
 **Parallel Execution:**
 

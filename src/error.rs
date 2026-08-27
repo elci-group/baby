@@ -34,6 +34,8 @@ pub enum ErrorKind {
     Watch,
     /// Version checking failed.
     VersionCheck,
+    /// Waiting for a contended resource lock exceeded the configured timeout.
+    LockTimeout,
 }
 
 impl fmt::Display for ErrorKind {
@@ -72,6 +74,10 @@ impl fmt::Display for ErrorKind {
             ErrorKind::VersionCheck => write!(
                 f,
                 "version check error; ensure curl is installed and you have internet connectivity"
+            ),
+            ErrorKind::LockTimeout => write!(
+                f,
+                "lock timeout; another build is holding the project lease and the wait timeout expired"
             ),
         }
     }
@@ -166,6 +172,17 @@ impl BabyError {
         Self {
             kind: ErrorKind::Watch,
             message: source.to_string(),
+        }
+    }
+
+    /// Lease acquisition timed out while waiting for a contended resource.
+    pub fn lock_timeout(resource: impl Into<String>) -> Self {
+        Self {
+            kind: ErrorKind::LockTimeout,
+            message: format!(
+                "timed out waiting for locksmith lease on {}; the holding build may be stuck",
+                resource.into()
+            ),
         }
     }
 

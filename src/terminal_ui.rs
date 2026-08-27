@@ -16,11 +16,13 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
-use crate::logger::{RENDER, erase_drawn};
+use crate::logger::{RENDER, erase_drawn, replace_drawn};
 
 const BABY_WIDTH: usize = 10;
 const BABY_HEIGHT: usize = 7;
 const FRAME_INTERVAL: Duration = Duration::from_millis(160);
+const SECONDARY_FIELD_INTERVAL: Duration = Duration::from_millis(1_200);
+const SECONDARY_FIELD_COUNT: usize = 3;
 
 /// Four crying-baby frames cycled while a build/install is in progress:
 /// mouth alternates open/closed and a tear blinks between cheeks.
@@ -258,9 +260,10 @@ impl Drop for InstallAnimation {
     }
 }
 
-/// Erase the previous block (if any), draw the current frame plus a live
-/// "stage · elapsed" status line, and record how many lines were drawn so
-/// the next erase (by this thread or a log write) clears exactly that much.
+/// Erase the previous block (if any), draw the current frame plus primary and
+/// secondary status lines, and record how many lines were drawn. The secondary
+/// line is a time-driven carousel, independent of the baby frame index, so all
+/// operational fields remain observable even if stages change infrequently.
 fn draw_frame(stage: &Arc<Mutex<StageState>>, project: &str, started: Instant, frame_idx: usize) {
     let (label, stage_elapsed) = match stage.lock() {
         Ok(stage) => (stage.label.clone(), stage.started.elapsed()),
@@ -273,18 +276,34 @@ fn draw_frame(stage: &Arc<Mutex<StageState>>, project: &str, started: Instant, f
         render_pixel_row(row, &mut block);
         block.push('\n');
     }
+    let total_elapsed = started.elapsed();
+    let (secondary, position) = secondary_field(project, stage_elapsed, total_elapsed);
+    block.push_str(&format!("  {label}…\n"));
     block.push_str(&format!(
-        "  \x1b[2m{label}… {:.1}s stage · {:.1}s total\x1b[0m\n",
-        stage_elapsed.as_secs_f64(),
-        started.elapsed().as_secs_f64()
+        "  \x1b[2m{secondary} · {position}/{SECONDARY_FIELD_COUNT}\x1b[0m\n"
     ));
 
     let mut render = RENDER.lock().unwrap_or_else(|e| e.into_inner());
     let mut stderr = io::stderr();
-    erase_drawn(&mut stderr, render.drawn_lines);
-    let _ = stderr.write_all(block.as_bytes());
+    replace_drawn(&mut stderr, render.drawn_lines, &block);
     let _ = stderr.flush();
-    render.drawn_lines = BABY_HEIGHT + 1;
+    render.drawn_lines = BABY_HEIGHT + 2;
+}
+
+fn secondary_field(
+    project: &str,
+    stage_elapsed: Duration,
+    total_elapsed: Duration,
+) -> (String, usize) {
+    let interval_ms = SECONDARY_FIELD_INTERVAL.as_millis();
+    let index =
+        ((total_elapsed.as_millis() / interval_ms) % SECONDARY_FIELD_COUNT as u128) as usize;
+    let text = match index {
+        0 => format!("stage {:.1}s", stage_elapsed.as_secs_f64()),
+        1 => format!("total {:.1}s", total_elapsed.as_secs_f64()),
+        _ => format!("project {project}"),
+    };
+    (text, index + 1)
 }
 
 fn format_elapsed(elapsed: Duration) -> String {
@@ -319,6 +338,37 @@ mod tests {
     #[test]
     fn formats_elapsed_for_install_summary() {
         assert_eq!(format_elapsed(Duration::from_millis(1_250)), "1.25s");
+    }
+
+    #[test]
+    fn secondary_carousel_visits_every_field_and_wraps() {
+        let interval = SECONDARY_FIELD_INTERVAL;
+        let first = secondary_field("clint", Duration::from_millis(300), Duration::ZERO);
+        let second = secondary_field("clint", interval, interval);
+        let third = secondary_field("clint", interval * 2, interval * 2);
+        let wrapped = secondary_field("clint", interval * 3, interval * 3);
+
+        assert_eq!(first, ("stage 0.3s".into(), 1));
+        assert_eq!(second, ("total 1.2s".into(), 2));
+        assert_eq!(third, ("project clint".into(), 3));
+        assert_eq!(wrapped.1, 1);
+    }
+
+    #[test]
+    fn secondary_stage_field_remains_live_between_carousel_transitions() {
+        let early = secondary_field(
+            "clint",
+            Duration::from_millis(100),
+            Duration::from_millis(100),
+        );
+        let later = secondary_field(
+            "clint",
+            Duration::from_millis(900),
+            Duration::from_millis(900),
+        );
+
+        assert_ne!(early.0, later.0);
+        assert_eq!(early.1, later.1);
     }
 
     #[test]
