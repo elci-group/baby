@@ -184,7 +184,7 @@ fn locksmith_available() -> bool {
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .status()
-        .map_or(false, |s| s.success())
+        .is_ok_and(|s| s.success())
 }
 
 /// Build a deterministic resource name from the canonical project path.
