@@ -217,5 +217,4 @@ mod tests {
         let name = resource_name(path, "widget");
         assert_eq!(name, format!("baby:widget@{}", path.display()));
     }
-
 }
