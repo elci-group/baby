@@ -6,6 +6,7 @@ pub mod boom;
 pub mod config;
 pub mod error;
 pub mod logger;
+pub mod lock;
 pub mod recipe;
 pub mod terminal_ui;
 pub mod versioning;
