@@ -25,6 +25,12 @@ pub const DEFAULT_LEASE_SECS: u64 = 20 * 60;
 /// Seconds between heartbeats while a lock is held.
 const HEARTBEAT_INTERVAL_SECS: u64 = 30;
 
+#[allow(clippy::assertions_on_constants)]
+const _: () = {
+    assert!(DEFAULT_TIMEOUT_SECS > 0);
+    assert!(DEFAULT_LEASE_SECS > HEARTBEAT_INTERVAL_SECS);
+};
+
 /// RAII handle for a locksmith lease. Releases the lease and stops the
 /// heartbeat thread when dropped.
 pub struct LockGuard {
@@ -212,10 +218,4 @@ mod tests {
         assert_eq!(name, format!("baby:widget@{}", path.display()));
     }
 
-    #[test]
-    fn default_timeouts_are_sensible() {
-        // Defaults should be positive and lease longer than a heartbeat cycle.
-        assert!(DEFAULT_TIMEOUT_SECS > 0);
-        assert!(DEFAULT_LEASE_SECS > HEARTBEAT_INTERVAL_SECS);
-    }
 }
