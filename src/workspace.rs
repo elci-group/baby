@@ -84,19 +84,19 @@ pub fn find_binary_crate_in_workspace(manifest: &Path) -> Result<PathBuf> {
                 });
 
             for crate_manifest in &binary_crates {
-                if let Ok(binary_name) = crate_binary_name(crate_manifest) {
-                    if binary_name == workspace_name {
-                        return Ok(crate_manifest.clone());
-                    }
+                if let Ok(binary_name) = crate_binary_name(crate_manifest)
+                    && binary_name == workspace_name
+                {
+                    return Ok(crate_manifest.clone());
                 }
             }
 
             // If no match found, prefer the one in a dir matching workspace name
             for crate_manifest in &binary_crates {
-                if let Some(parent) = crate_manifest.parent().and_then(|p| p.file_name()) {
-                    if parent.to_string_lossy() == workspace_name {
-                        return Ok(crate_manifest.clone());
-                    }
+                if let Some(parent) = crate_manifest.parent().and_then(|p| p.file_name())
+                    && parent.to_string_lossy() == workspace_name
+                {
+                    return Ok(crate_manifest.clone());
                 }
             }
 
@@ -143,12 +143,11 @@ fn crate_binary_name(manifest: &Path) -> Result<String> {
     // In TOML, [[bin]] becomes an array of tables under the "bin" key
     if let Some(bins) = value.get("bin") {
         // If it's an array, get the first entry
-        if let Some(arr) = bins.as_array() {
-            if let Some(first_bin) = arr.first() {
-                if let Some(name) = first_bin.get("name").and_then(toml::Value::as_str) {
-                    return Ok(name.to_string());
-                }
-            }
+        if let Some(arr) = bins.as_array()
+            && let Some(first_bin) = arr.first()
+            && let Some(name) = first_bin.get("name").and_then(toml::Value::as_str)
+        {
+            return Ok(name.to_string());
         }
         // If it's a single table (shouldn't happen with [[bin]]), try to extract name
         else if let Some(name) = bins.get("name").and_then(toml::Value::as_str) {

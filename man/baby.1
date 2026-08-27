@@ -1,10 +1,10 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
-.TH baby 1  "baby 0.3.2" 
+.TH baby 1  "baby 0.9.4" 
 .SH NAME
 baby \- Build a project from a recipe and install its binary
 .SH SYNOPSIS
-\fBbaby\fR [\fB\-\-run\fR] [\fB\-\-strip\fR] [\fB\-\-backup\fR] [\fB\-\-service\fR] [\fB\-\-sudo\fR] [\fB\-\-user\fR] [\fB\-\-dry\-run\fR] [\fB\-\-no\-clean\fR] [\fB\-\-target\-dir\fR] [\fB\-\-install\-dir\fR] [\fB\-\-recipe\fR] [\fB\-\-check\-recipe\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] [\fIRUN_ARGS\fR] 
+\fBbaby\fR [\fB\-\-run\fR] [\fB\-\-strip\fR] [\fB\-\-backup\fR] [\fB\-\-service\fR] [\fB\-\-sudo\fR] [\fB\-\-user\fR] [\fB\-\-dry\-run\fR] [\fB\-\-no\-clean\fR] [\fB\-\-no\-boar\fR] [\fB\-\-no\-lock\fR] [\fB\-\-lock\-timeout\fR] [\fB\-\-lock\-lease\fR] [\fB\-\-target\-dir\fR] [\fB\-\-install\-dir\fR] [\fB\-\-recipe\fR] [\fB\-\-check\-recipe\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] [\fIRUN_ARGS\fR] [\fIsubcommands\fR]
 .SH DESCRIPTION
 .PP
 BABY — Build And Bin Yield
@@ -21,6 +21,11 @@ Examples:
   baby \-\-run \-\- \-\-help      # pass \-\-help to the installed binary
   baby \-\-dry\-run            # preview what would be done
   baby \-\-recipe .baby.toml  # use an explicit versioned installation recipe
+  baby update               # check for updates (\-\-stable by default)
+  baby update \-\-nightly     # check for nightly builds
+  baby update \-\-bleeding    # check for bleeding edge builds
+  baby boom                 # discover and update all managed tools
+  baby boom \-\-interactive   # select which tools to update interactively
 .SH OPTIONS
 .TP
 \fB\-\-run\fR
@@ -45,7 +50,19 @@ Install to ~/.local/bin instead of /usr/local/bin
 Show what would happen without executing
 .TP
 \fB\-\-no\-clean\fR
-Keep Cargo build artefacts after installation
+Keep build artefacts after installation
+.TP
+\fB\-\-no\-boar\fR
+Never delegate a failed build to `boar` for RAM/disk recovery
+.TP
+\fB\-\-no\-lock\fR
+Skip locksmithd coordination even when the CLI is available
+.TP
+\fB\-\-lock\-timeout\fR \fI<SECS>\fR
+Seconds to wait for a contended locksmith lease (default: 300)
+.TP
+\fB\-\-lock\-lease\fR \fI<SECS>\fR
+Seconds to request for the locksmith lease duration (default: 1200)
 .TP
 \fB\-\-target\-dir\fR \fI<TARGET_DIR>\fR
 Custom target directory (default: target/release)
@@ -67,5 +84,15 @@ Print version
 .TP
 [\fIRUN_ARGS\fR]
 Pass additional arguments when running with \-\-run
+.SH SUBCOMMANDS
+.TP
+baby\-update(1)
+Check for available updates
+.TP
+baby\-boom(1)
+Discover and update all managed tools in parallel
+.TP
+baby\-help(1)
+Print this message or the help of the given subcommand(s)
 .SH VERSION
-v0.3.2
+v0.9.4
