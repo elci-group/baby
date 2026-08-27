@@ -55,7 +55,11 @@ impl Drop for LockGuard {
             let _ = handle.join();
         }
         if let Err(e) = release(&self.resource) {
-            log::warn!("failed to release locksmith lease for {}: {}", self.resource, e);
+            log::warn!(
+                "failed to release locksmith lease for {}: {}",
+                self.resource,
+                e
+            );
         }
     }
 }
@@ -111,7 +115,11 @@ pub fn acquire_build_lock(
 
     Err(BabyError::new(
         crate::error::ErrorKind::LockTimeout,
-        format!("locksmith acquire failed for {}: {}", resource, stderr.trim()),
+        format!(
+            "locksmith acquire failed for {}: {}",
+            resource,
+            stderr.trim()
+        ),
     ))
 }
 

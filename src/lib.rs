@@ -5,8 +5,8 @@ pub mod boar;
 pub mod boom;
 pub mod config;
 pub mod error;
-pub mod logger;
 pub mod lock;
+pub mod logger;
 pub mod recipe;
 pub mod terminal_ui;
 pub mod versioning;
@@ -73,7 +73,6 @@ pub fn generate_man(cmd: &clap::Command, path: &Path) -> Result<()> {
 }
 
 /// Configuration controlling how a binary is built and installed.
-#[derive(Default)]
 pub struct InstallConfig {
     /// Strip debug symbols from the binary before installing.
     pub strip: bool,
@@ -97,6 +96,33 @@ pub struct InstallConfig {
     pub install_dir: Option<PathBuf>,
     /// Explicit versioned installation recipe.
     pub recipe: Option<PathBuf>,
+    /// Skip locksmithd coordination for this run.
+    pub no_lock: bool,
+    /// Seconds to wait for a contended locksmith lease.
+    pub lock_timeout_secs: u64,
+    /// Seconds to request for the locksmith lease duration.
+    pub lock_lease_secs: u64,
+}
+
+impl Default for InstallConfig {
+    fn default() -> Self {
+        Self {
+            strip: false,
+            backup: false,
+            service: false,
+            sudo: false,
+            user: false,
+            dry_run: false,
+            no_clean: false,
+            no_boar: false,
+            target_dir: None,
+            install_dir: None,
+            recipe: None,
+            no_lock: false,
+            lock_timeout_secs: crate::lock::DEFAULT_TIMEOUT_SECS,
+            lock_lease_secs: crate::lock::DEFAULT_LEASE_SECS,
+        }
+    }
 }
 
 /// Infer the project name from the current working directory's final component.
@@ -292,6 +318,18 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
     );
 
     let mut animation = terminal_ui::InstallAnimation::start(&project, !config.dry_run);
+
+    let _lock_guard = if config.no_lock || config.dry_run {
+        None
+    } else {
+        install_ticker(animation.as_ref(), "🔐", "acquiring project lease");
+        lock::acquire_build_lock(
+            &root,
+            &project,
+            config.lock_timeout_secs,
+            config.lock_lease_secs,
+        )?
+    };
 
     let outcome = run_recipe_commands(config, animation.as_ref(), &recipe, &root)?;
 
@@ -1099,6 +1137,9 @@ mod tests {
         assert!(!cfg.user);
         assert!(!cfg.dry_run);
         assert!(!cfg.no_boar);
+        assert!(!cfg.no_lock);
+        assert_eq!(cfg.lock_timeout_secs, crate::lock::DEFAULT_TIMEOUT_SECS);
+        assert_eq!(cfg.lock_lease_secs, crate::lock::DEFAULT_LEASE_SECS);
         assert!(cfg.target_dir.is_none());
         assert!(cfg.install_dir.is_none());
         assert!(cfg.recipe.is_none());

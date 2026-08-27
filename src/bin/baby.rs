@@ -75,6 +75,18 @@ struct Args {
     #[arg(long)]
     no_boar: bool,
 
+    /// Skip locksmithd coordination even when the CLI is available
+    #[arg(long)]
+    no_lock: bool,
+
+    /// Seconds to wait for a contended locksmith lease (default: 300)
+    #[arg(long, value_name = "SECS")]
+    lock_timeout: Option<u64>,
+
+    /// Seconds to request for the locksmith lease duration (default: 1200)
+    #[arg(long, value_name = "SECS")]
+    lock_lease: Option<u64>,
+
     /// Custom target directory (default: target/release)
     #[arg(long)]
     target_dir: Option<PathBuf>,
@@ -176,6 +188,11 @@ async fn run() -> Result<()> {
         dry_run: args.dry_run,
         no_clean: args.no_clean,
         no_boar: args.no_boar,
+        no_lock: args.no_lock,
+        lock_timeout_secs: args
+            .lock_timeout
+            .unwrap_or(baby::lock::DEFAULT_TIMEOUT_SECS),
+        lock_lease_secs: args.lock_lease.unwrap_or(baby::lock::DEFAULT_LEASE_SECS),
         target_dir: args.target_dir,
         install_dir: args.install_dir,
         recipe: args.recipe,

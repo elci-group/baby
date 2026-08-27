@@ -24,6 +24,17 @@ fn baby_help_documents_post_install_cleanup_override() {
 }
 
 #[test]
+fn baby_help_documents_locksmith_flags() {
+    let mut cmd = Command::cargo_bin("baby").unwrap();
+    cmd.arg("--help");
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("--no-lock"))
+        .stdout(predicate::str::contains("--lock-timeout"))
+        .stdout(predicate::str::contains("--lock-lease"));
+}
+
+#[test]
 fn baby_version_prints_semver() {
     let mut cmd = Command::cargo_bin("baby").unwrap();
     cmd.arg("--version");
