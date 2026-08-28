@@ -80,6 +80,32 @@ is an argument array, so it is executed directly without a shell. A
 present. Use `baby --check-recipe` to validate and print the resolved recipe
 without compiling or installing.
 
+#### Graceful restart hooks
+
+By default, `install_binary` never truncates a binary in place — it stages
+the new one alongside the old and `rename`s it into place, so installing
+over a currently-running binary never fails with `ETXTBSY`. The running
+process keeps serving the old (now unlinked) inode until it's restarted.
+
+`--service` triggers that restart, and by default it's a hard
+`systemctl restart <binary>.service`. For a daemon that needs to hand off
+gracefully instead of being killed mid-request (leader election, in-flight
+connections, etc.), set `restart_command` in the recipe to run your own
+handoff tooling instead:
+
+```toml
+restart_command = ["widget-cli", "shark", "upgrade", "{binary}"]
+```
+
+`{binary}` is replaced with the resolved install path before the command
+runs. This is intentionally a hand-off point, not a built-in leader-election
+implementation — `baby` doesn't know how any given daemon manages its own
+runtime state. kaptaind's own `.baby.toml` uses this to call
+`kaptaind-cli shark upgrade`, which spawns the new binary as a standby,
+health-checks it, and only then asks the old leader to retire (see
+kaptaind's "Shark Stating" docs). Omit `restart_command` to keep the
+default hard restart.
+
 ### Watch configuration
 
 `birthd` discovers `.birth.toml` files in three places:
