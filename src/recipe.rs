@@ -27,7 +27,14 @@ pub enum BuildSystem {
 pub struct InstallRecipe {
     pub schema: String,
     pub build_system: BuildSystem,
+    /// Marks a recipe as installing nothing (e.g. a library-only crate with
+    /// no binary target). `binary`/`artifact`/`commands` are ignored and
+    /// `build_and_install` no-ops after resolving the recipe.
+    #[serde(default)]
+    pub library: bool,
+    #[serde(default)]
     pub binary: String,
+    #[serde(default)]
     pub artifact: PathBuf,
     #[serde(default)]
     pub commands: Vec<Vec<String>>,
@@ -60,6 +67,16 @@ impl InstallRecipe {
                     self.schema
                 ),
             ));
+        }
+        if self.library {
+            return if root.is_dir() {
+                Ok(())
+            } else {
+                Err(BabyError::new(
+                    ErrorKind::RecipeInvalid,
+                    format!("recipe root {} is not a directory", root.display()),
+                ))
+            };
         }
         if self.binary.trim().is_empty() || self.binary.contains(['/', '\\']) {
             return Err(BabyError::new(
@@ -171,6 +188,7 @@ impl InstallRecipe {
         Ok(Self {
             schema: RECIPE_SCHEMA.to_string(),
             build_system: BuildSystem::Cargo,
+            library: false,
             artifact: PathBuf::from("target/release").join(&binary),
             commands: vec![vec![
                 "cargo".into(),
@@ -207,6 +225,21 @@ mod tests {
     }
 
     #[test]
+    fn loads_library_recipe_without_binary_or_commands() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(".baby.toml");
+        fs::write(
+            &path,
+            "schema = \"baby.install/v1\"\nbuild_system = \"cargo\"\nlibrary = true\n",
+        )
+        .unwrap();
+        let recipe = InstallRecipe::load(&path).unwrap();
+        assert!(recipe.library);
+        assert!(recipe.binary.is_empty());
+        assert!(recipe.commands.is_empty());
+    }
+
+    #[test]
     fn rejects_unknown_schema_before_execution() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join(".baby.toml");
@@ -238,6 +271,7 @@ mod tests {
         let recipe = InstallRecipe {
             schema: RECIPE_SCHEMA.to_string(),
             build_system: BuildSystem::Script,
+            library: false,
             binary: "x".into(),
             artifact: PathBuf::from("../x"),
             commands: vec![vec!["make".into()]],
@@ -272,6 +306,7 @@ mod tests {
         let recipe = InstallRecipe {
             schema: RECIPE_SCHEMA.to_string(),
             build_system: BuildSystem::Script,
+            library: false,
             binary: "x".into(),
             artifact: PathBuf::from("out/x"),
             commands: vec![vec!["make".into()]],

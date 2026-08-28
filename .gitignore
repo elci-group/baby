@@ -6,4 +6,8 @@
 /.brandi/state
 amber_report.json
 fract.report/
+.boaring.toml
+tmux-client-*.log
+tmux-server-*.log
+/.skillastic/state.tmp
 

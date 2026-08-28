@@ -1,3 +1,3 @@
 skillastic daemon: watching /home/sal/baby every 300s
-[2026-08-27 10:51:51] change detected: app 0.8.4 -> 0.8.4, head Some("a0996a1") -> Some("65d4146")
-[2026-08-27 10:51:51] resolve baby-dev: load (skill verified for app 0.8.4)
+[2026-08-28 08:31:44] change detected: app 0.8.4 -> 0.8.4, head Some("65d4146") -> Some("7694dd7")
+[2026-08-28 08:31:44] resolve baby-dev: load (skill verified for app 0.8.4)

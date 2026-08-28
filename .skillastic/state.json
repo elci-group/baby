@@ -1,13 +1,15 @@
 {
   "last_app_version": "0.8.4",
-  "last_head": "65d4146",
-  "last_check": "2026-08-27T17:04:34.263499067Z",
+  "last_head": "7694dd7",
+  "last_check": "2026-08-28T12:32:28.637032024Z",
   "events": [
     "[2026-08-26 16:14:11] change detected: app ? -> 0.8.4, head None -> Some(\"570e339\")",
     "[2026-08-26 16:14:11] resolve baby-dev: load (skill verified for app 0.8.4)",
     "[2026-08-26 16:19:11] change detected: app 0.8.4 -> 0.8.4, head Some(\"570e339\") -> Some(\"a0996a1\")",
     "[2026-08-26 16:19:11] resolve baby-dev: load (skill verified for app 0.8.4)",
     "[2026-08-27 10:51:51] change detected: app 0.8.4 -> 0.8.4, head Some(\"a0996a1\") -> Some(\"65d4146\")",
-    "[2026-08-27 10:51:51] resolve baby-dev: load (skill verified for app 0.8.4)"
+    "[2026-08-27 10:51:51] resolve baby-dev: load (skill verified for app 0.8.4)",
+    "[2026-08-28 08:31:44] change detected: app 0.8.4 -> 0.8.4, head Some(\"65d4146\") -> Some(\"7694dd7\")",
+    "[2026-08-28 08:31:44] resolve baby-dev: load (skill verified for app 0.8.4)"
   ]
 }

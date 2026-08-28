@@ -273,6 +273,14 @@ pub fn resolve_install_recipe(config: &InstallConfig) -> Result<(recipe::Install
 pub fn build_and_install(config: &InstallConfig) -> Result<()> {
     let started_at = Instant::now();
     let (mut recipe, root) = resolve_install_recipe(config)?;
+    if recipe.library {
+        log::info!(
+            "{} is a library-only recipe (schema={}); nothing to build or install",
+            root.display(),
+            recipe.schema
+        );
+        return Ok(());
+    }
     let project = recipe.binary.clone();
     log::info!(
         "installation recipe resolved: schema={} build_system={:?} binary={project}",
@@ -1421,6 +1429,7 @@ mod tests {
         let recipe = recipe::InstallRecipe {
             schema: recipe::RECIPE_SCHEMA.to_string(),
             build_system: recipe::BuildSystem::Cargo,
+            library: false,
             binary: "widget".into(),
             artifact: PathBuf::from("target/release/widget"),
             commands: vec![vec!["cargo".into(), "build".into(), "--release".into()]],
@@ -1438,6 +1447,7 @@ mod tests {
         let recipe = recipe::InstallRecipe {
             schema: recipe::RECIPE_SCHEMA.to_string(),
             build_system: recipe::BuildSystem::Cargo,
+            library: false,
             binary: "widget".into(),
             artifact: PathBuf::from("target/release/widget"),
             commands: vec![vec!["cargo".into(), "build".into(), "--release".into()]],
