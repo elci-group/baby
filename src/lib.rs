@@ -1204,7 +1204,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn install_binary_overwrites_a_running_target() {
         // Regression test: fs::copy's in-place truncate fails with ETXTBSY
         // (os error 26) when `to` is currently executing. install_binary
