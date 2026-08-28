@@ -814,6 +814,14 @@ fn backup_existing(config: &InstallConfig, install_path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Install `from` at `to` by staging a copy alongside the destination and
+/// `rename`-ing it into place, rather than truncating the destination file
+/// in place. A running process keeps its old binary mapped for execution;
+/// truncating that inode (what `fs::copy` does when `to` already exists)
+/// fails with ETXTBSY. `rename` only repoints the directory entry, so it
+/// succeeds even while the old inode is still executing — the running
+/// process keeps serving from the orphaned old inode until it exits or is
+/// restarted (e.g. by the systemd restart baby issues right after this).
 fn install_binary(config: &InstallConfig, from: &Path, to: &Path) -> Result<()> {
     if config.dry_run {
         log::info!(
@@ -824,17 +832,85 @@ fn install_binary(config: &InstallConfig, from: &Path, to: &Path) -> Result<()> 
         return Ok(());
     }
 
-    fs::copy(from, to)
-        .map_err(|e| BabyError::io(format!("install {} -> {}", from.display(), to.display()), e))?;
+    let parent = to.parent().ok_or_else(|| {
+        BabyError::new(
+            crate::error::ErrorKind::Io,
+            format!("install path {} has no parent directory", to.display()),
+        )
+    })?;
 
-    let mut permissions = fs::metadata(to)
-        .map_err(|e| BabyError::io(format!("read permissions of {}", to.display()), e))?
+    let mut staged = tempfile::Builder::new()
+        .prefix(&format!(
+            ".{}.",
+            to.file_name().and_then(|n| n.to_str()).unwrap_or("baby-install")
+        ))
+        .tempfile_in(parent)
+        .map_err(|e| BabyError::io(format!("create temp file in {}", parent.display()), e))?;
+
+    let mut source = fs::File::open(from)
+        .map_err(|e| BabyError::io(format!("open {}", from.display()), e))?;
+    io::copy(&mut source, staged.as_file_mut())
+        .map_err(|e| BabyError::io(format!("copy {} -> temp file", from.display()), e))?;
+
+    let mut permissions = staged
+        .as_file()
+        .metadata()
+        .map_err(|e| BabyError::io("read temp file metadata", e))?
         .permissions();
     permissions.set_mode(0o755);
-    fs::set_permissions(to, permissions)
-        .map_err(|e| BabyError::io(format!("set permissions of {}", to.display()), e))?;
+    staged
+        .as_file()
+        .set_permissions(permissions)
+        .map_err(|e| BabyError::io("set permissions of temp file", e))?;
+
+    staged.persist(to).map_err(|e| {
+        let busy = processes_executing(to);
+        let mut context = format!("install {} -> {}", from.display(), to.display());
+        if !busy.is_empty() {
+            let who = busy
+                .iter()
+                .map(|(pid, comm)| format!("{comm}(pid {pid})"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            context = format!("{context} (currently running: {who})");
+        }
+        BabyError::io(context, e.error)
+    })?;
 
     Ok(())
+}
+
+/// Return `(pid, comm)` for every process currently executing `path`, by
+/// scanning `/proc/*/exe`. Used only to enrich error messages; failures to
+/// read `/proc` are silently ignored since this is best-effort diagnostics.
+#[cfg(target_os = "linux")]
+fn processes_executing(path: &Path) -> Vec<(u32, String)> {
+    let Ok(canonical) = fs::canonicalize(path) else {
+        return Vec::new();
+    };
+    let Ok(entries) = fs::read_dir("/proc") else {
+        return Vec::new();
+    };
+    let mut hits = Vec::new();
+    for entry in entries.flatten() {
+        let Some(pid) = entry.file_name().to_str().and_then(|s| s.parse::<u32>().ok()) else {
+            continue;
+        };
+        let Ok(exe_target) = fs::read_link(entry.path().join("exe")) else {
+            continue;
+        };
+        if exe_target == canonical {
+            let comm = fs::read_to_string(entry.path().join("comm"))
+                .unwrap_or_else(|_| "?".into());
+            hits.push((pid, comm.trim().to_string()));
+        }
+    }
+    hits
+}
+
+#[cfg(not(target_os = "linux"))]
+fn processes_executing(_path: &Path) -> Vec<(u32, String)> {
+    Vec::new()
 }
 
 fn restart_systemd_service(
@@ -1125,6 +1201,32 @@ mod tests {
     fn process_not_alive_for_high_pid() {
         // PID 99999 is extremely unlikely to exist on a normal system.
         assert!(!is_process_alive(99999));
+    }
+
+    #[test]
+    #[test]
+    fn install_binary_overwrites_a_running_target() {
+        // Regression test: fs::copy's in-place truncate fails with ETXTBSY
+        // (os error 26) when `to` is currently executing. install_binary
+        // must succeed anyway by staging + renaming instead of truncating.
+        let dir = tempfile::tempdir().unwrap();
+        let old = dir.path().join("target");
+        let new = dir.path().join("source");
+        fs::copy("/bin/sleep", &old).unwrap();
+        fs::copy("/bin/sleep", &new).unwrap();
+        let mut perms = fs::metadata(&old).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&old, perms).unwrap();
+
+        let mut child = Command::new(&old).arg("2").spawn().unwrap();
+
+        let config = InstallConfig::default();
+        let result = install_binary(&config, &new, &old);
+
+        child.kill().ok();
+        child.wait().ok();
+
+        result.unwrap();
     }
 
     #[test]
