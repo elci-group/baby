@@ -413,7 +413,13 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
     );
 
     if config.service {
-        restart_systemd_service(config, animation.as_ref(), &project)?;
+        run_post_install_restart(
+            config,
+            animation.as_ref(),
+            &project,
+            recipe.restart_command.as_deref(),
+            &install_path,
+        )?;
     }
 
     let cleanup_ran = recipe.build_system == recipe::BuildSystem::Cargo
@@ -913,6 +919,82 @@ fn processes_executing(_path: &Path) -> Vec<(u32, String)> {
     Vec::new()
 }
 
+/// Run the post-install restart step: a recipe-supplied `restart_command`
+/// (for daemons that hand off gracefully, e.g. kaptaind's shark-stating)
+/// when present, otherwise the default hard `systemctl restart`.
+fn run_post_install_restart(
+    config: &InstallConfig,
+    animation: Option<&terminal_ui::InstallAnimation>,
+    project: &str,
+    restart_command: Option<&[String]>,
+    install_path: &Path,
+) -> Result<()> {
+    match restart_command {
+        Some(argv) => run_restart_hook(config, animation, argv, install_path),
+        None => restart_systemd_service(config, animation, project),
+    }
+}
+
+/// Run a recipe-supplied restart hook instead of `systemctl restart`, so a
+/// running daemon can hand off leadership/state gracefully before the old
+/// process is replaced, rather than being hard-killed and relaunched.
+/// Any argument equal to the literal token `{binary}` is replaced with the
+/// resolved install path.
+fn run_restart_hook(
+    config: &InstallConfig,
+    animation: Option<&terminal_ui::InstallAnimation>,
+    argv: &[String],
+    install_path: &Path,
+) -> Result<()> {
+    let install_path_str = install_path.display().to_string();
+    let resolved: Vec<String> = argv
+        .iter()
+        .map(|arg| {
+            if arg == "{binary}" {
+                install_path_str.clone()
+            } else {
+                arg.clone()
+            }
+        })
+        .collect();
+
+    let mut cmd = Command::new(&resolved[0]);
+    cmd.args(&resolved[1..]);
+
+    if config.sudo {
+        cmd = wrap_sudo(cmd);
+    }
+
+    if config.dry_run {
+        log::info!("[dry-run] would run: {}", format_command(&cmd));
+        return Ok(());
+    }
+
+    install_ticker(
+        animation,
+        "🦈",
+        &format!("running graceful restart hook: {}", format_command(&cmd)),
+    );
+    if let Some(a) = animation {
+        a.pause();
+    }
+    let status = cmd
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()
+        .map_err(|e| BabyError::io("run restart hook", e))?;
+    if let Some(a) = animation {
+        a.resume();
+    }
+
+    if !status.success() {
+        return Err(BabyError::command_failed(format_command(&cmd), status.code()));
+    }
+
+    log::info!("ran graceful restart hook for {}", install_path.display());
+    Ok(())
+}
+
 fn restart_systemd_service(
     config: &InstallConfig,
     animation: Option<&terminal_ui::InstallAnimation>,
@@ -1201,6 +1283,56 @@ mod tests {
     fn process_not_alive_for_high_pid() {
         // PID 99999 is extremely unlikely to exist on a normal system.
         assert!(!is_process_alive(99999));
+    }
+
+    #[test]
+    fn run_restart_hook_substitutes_binary_placeholder() {
+        let dir = tempfile::tempdir().unwrap();
+        let output = dir.path().join("out.txt");
+        let install_path = dir.path().join("installed-widget");
+        let argv = vec![
+            "/bin/sh".to_string(),
+            "-c".to_string(),
+            format!("printf '%s' \"$1\" > {}", output.display()),
+            "_".to_string(),
+            "{binary}".to_string(),
+        ];
+        let config = InstallConfig::default();
+        run_restart_hook(&config, None, &argv, &install_path).unwrap();
+        let written = fs::read_to_string(&output).unwrap();
+        assert_eq!(written, install_path.display().to_string());
+    }
+
+    #[test]
+    fn run_restart_hook_skips_execution_in_dry_run() {
+        let dir = tempfile::tempdir().unwrap();
+        let output = dir.path().join("out.txt");
+        let install_path = dir.path().join("installed-widget");
+        let argv = vec![
+            "/bin/sh".to_string(),
+            "-c".to_string(),
+            format!("touch {}", output.display()),
+        ];
+        let config = InstallConfig {
+            dry_run: true,
+            ..InstallConfig::default()
+        };
+        run_restart_hook(&config, None, &argv, &install_path).unwrap();
+        assert!(!output.exists());
+    }
+
+    #[test]
+    fn run_post_install_restart_prefers_recipe_hook_over_systemd() {
+        // With a restart_command present, dispatch must run the hook and
+        // never shell out to systemctl (which would fail/hang in a test
+        // sandbox with no such service).
+        let dir = tempfile::tempdir().unwrap();
+        let output = dir.path().join("out.txt");
+        let install_path = dir.path().join("installed-widget");
+        let argv = vec!["/bin/sh".to_string(), "-c".to_string(), format!("touch {}", output.display())];
+        let config = InstallConfig::default();
+        run_post_install_restart(&config, None, "widget", Some(&argv), &install_path).unwrap();
+        assert!(output.exists());
     }
 
     #[test]
