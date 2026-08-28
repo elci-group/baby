@@ -36,6 +36,18 @@ pub enum ErrorKind {
     VersionCheck,
     /// Waiting for a contended resource lock exceeded the configured timeout.
     LockTimeout,
+    /// Git authentication failed (e.g. missing/rejected SSH key).
+    GitAuthFailed,
+    /// The remote host could not be reached (DNS/network failure).
+    GitNetworkUnreachable,
+    /// The remote repository does not exist or is inaccessible.
+    GitRepoNotFound,
+    /// The filesystem ran out of space mid-operation.
+    DiskFull,
+    /// A required compiler/linker was not found on `PATH`.
+    BuildToolchainMissing,
+    /// The install target could not be written due to filesystem permissions.
+    InstallPermissionDenied,
 }
 
 impl fmt::Display for ErrorKind {
@@ -78,6 +90,30 @@ impl fmt::Display for ErrorKind {
             ErrorKind::LockTimeout => write!(
                 f,
                 "lock timeout; another build is holding the project lease and the wait timeout expired"
+            ),
+            ErrorKind::GitAuthFailed => write!(
+                f,
+                "git authentication failed; add a deploy key or check `ssh -T git@<host>`, or switch the repo URL to HTTPS with a credential helper configured"
+            ),
+            ErrorKind::GitNetworkUnreachable => write!(
+                f,
+                "could not resolve the git remote host; check your network connection, DNS, and any proxy settings"
+            ),
+            ErrorKind::GitRepoNotFound => write!(
+                f,
+                "git repository not found; check the repo URL for typos and that you have access to it"
+            ),
+            ErrorKind::DiskFull => write!(
+                f,
+                "no space left on device; free up disk space (check the build's temp directory and target volume) and retry"
+            ),
+            ErrorKind::BuildToolchainMissing => write!(
+                f,
+                "build toolchain missing; install a C linker (e.g. `build-essential`/`gcc`) and retry"
+            ),
+            ErrorKind::InstallPermissionDenied => write!(
+                f,
+                "permission denied writing the install target; retry with --user, or --sudo if a system-wide install is required"
             ),
         }
     }

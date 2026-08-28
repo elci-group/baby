@@ -75,7 +75,7 @@ struct Args {
     #[arg(long)]
     no_boar: bool,
 
-    /// Skip locksmithd coordination even when the CLI is available
+    /// Skip all locksmithd coordination (repo-wide wait and project lease)
     #[arg(long)]
     no_lock: bool,
 
@@ -86,6 +86,10 @@ struct Args {
     /// Seconds to request for the locksmith lease duration (default: 1200)
     #[arg(long, value_name = "SECS")]
     lock_lease: Option<u64>,
+
+    /// Seconds to wait for all repo-wide locksmith leases to clear (default: 300)
+    #[arg(long, value_name = "SECS")]
+    repo_lock_timeout: Option<u64>,
 
     /// Custom target directory (default: target/release)
     #[arg(long)]
@@ -193,6 +197,9 @@ async fn run() -> Result<()> {
             .lock_timeout
             .unwrap_or(baby::lock::DEFAULT_TIMEOUT_SECS),
         lock_lease_secs: args.lock_lease.unwrap_or(baby::lock::DEFAULT_LEASE_SECS),
+        repo_lock_timeout_secs: args
+            .repo_lock_timeout
+            .unwrap_or(baby::lock::DEFAULT_TIMEOUT_SECS),
         target_dir: args.target_dir,
         install_dir: args.install_dir,
         recipe: args.recipe,

@@ -31,7 +31,8 @@ fn baby_help_documents_locksmith_flags() {
         .success()
         .stdout(predicate::str::contains("--no-lock"))
         .stdout(predicate::str::contains("--lock-timeout"))
-        .stdout(predicate::str::contains("--lock-lease"));
+        .stdout(predicate::str::contains("--lock-lease"))
+        .stdout(predicate::str::contains("--repo-lock-timeout"));
 }
 
 #[test]

@@ -46,6 +46,21 @@ pub enum UpdateStatus {
     Skipped,
 }
 
+impl UpdateStatus {
+    /// A short glyph for this status, shared by the live grid, the
+    /// non-TTY log fallback, and the final execution report so all three
+    /// views denote the same outcome the same way.
+    pub fn symbol(&self) -> &'static str {
+        match self {
+            UpdateStatus::Update => "✅",
+            UpdateStatus::Install => "📦",
+            UpdateStatus::Current => "✓",
+            UpdateStatus::Error => "❌",
+            UpdateStatus::Skipped => "⊘",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ExecutionPlan {
     pub tools: Vec<UpdateInfo>,
@@ -63,6 +78,27 @@ pub struct ExecutionResult {
     pub status: UpdateStatus,
     pub message: String,
     pub duration_ms: u128,
+}
+
+/// A tool's lifecycle stage during [`super::execution::execute_updates`],
+/// reported live over a channel so a renderer (see `boom::grid`) can show
+/// real, out-of-order progress instead of only a final batch result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToolPhase {
+    /// Selected for this run, not yet dequeued to a worker slot.
+    Queued,
+    /// Actively cloning/building/installing.
+    Building,
+    /// Settled into a terminal [`UpdateStatus`].
+    Done(UpdateStatus),
+}
+
+/// One state transition for one tool, emitted by `execute_updates`.
+#[derive(Debug, Clone)]
+pub struct ToolEvent {
+    pub tool_name: String,
+    pub phase: ToolPhase,
+    pub detail: String,
 }
 
 #[derive(Debug)]

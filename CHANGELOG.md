@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `baby boom` now runs end-to-end (discover → detect → confirm/select →
+  execute → report); it previously only logged a "under development"
+  stub.
+- Live animated progress for `baby boom`: a three-zone grid
+  (Requirements | Compiled | Errors) redrawn in place on a TTY, built on
+  `form3`'s table/animation primitives, with packages moving out of
+  Requirements as they settle. Off a TTY (piped output, CI), the same
+  transitions are logged one line per event instead.
+- Deterministic `ErrorKind` variants for common `boom` build/install
+  failures (git auth, DNS/network unreachable, repo not found, disk
+  full, missing build toolchain, install permission denied), each with
+  specific remediation text, classified from command stderr.
 - Structured `BabyError` type with `ErrorKind` classification.
 - Unit tests for `error`, `config`, and `lib` modules.
 - Integration tests for `baby`, `birthctl`, and `birthd` CLIs.
@@ -19,9 +31,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `boom::execute_updates` now runs tools concurrently, bounded by
+  `parallelism`, instead of one at a time (`parallelism` was previously
+  accepted but ignored).
 - Replaced shell-outs to `mkdir`, `cp`, and `install` with `std::fs` operations.
 - Replaced `chrono` with a custom UTC timestamp formatter.
 - `birthd` now uses the shared logger and writes to both stderr and its log file.
+
+### Fixed
+
+- `boom::detect_updates` no longer silently drops most tools when
+  `parallelism` is smaller than the tool count — it used to `await` and
+  discard every completed batch except the last.
 
 ### Removed
 

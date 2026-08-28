@@ -6,15 +6,16 @@
 //!
 //! Locking is best-effort: if the `locksmith` CLI is not installed or the
 //! daemon cannot be reached, `baby` proceeds with a warning. When locking is
-//! available, `baby` acquires an exclusive lease on a resource derived from
-//! the canonical project path, heartbeats while the build runs, and releases
-//! the lease on completion or panic.
+//! available, `baby` first waits for every active locksmith lease whose
+//! resource names embed the canonical project root to clear, then acquires an
+//! exclusive lease on a resource derived from that path, heartbeats while the
+//! build runs, and releases the lease on completion or panic.
 
 use std::path::Path;
 use std::process::Command;
 use std::sync::mpsc;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::error::{BabyError, Result};
 
@@ -24,6 +25,8 @@ pub const DEFAULT_TIMEOUT_SECS: u64 = 300;
 pub const DEFAULT_LEASE_SECS: u64 = 20 * 60;
 /// Seconds between heartbeats while a lock is held.
 const HEARTBEAT_INTERVAL_SECS: u64 = 30;
+/// Seconds between polls while waiting for repo-wide locks to clear.
+pub const REPO_UNLOCK_POLL_INTERVAL_SECS: u64 = 3;
 
 #[allow(clippy::assertions_on_constants)]
 const _: () = {
@@ -129,6 +132,107 @@ pub fn acquire_build_lock(
     ))
 }
 
+/// Wait until no active locksmith lease names the canonical `repo_root` path.
+///
+/// This is a pre-flight gate: before `baby` mutates the project, it polls
+/// `locksmith leases --json` and blocks while any lease's resource string
+/// contains the canonical repo path. The check catches `baby`'s own
+/// `baby:{project}@{path}` leases as well as path-based resources from other
+/// tools.
+///
+/// Best-effort: if the `locksmith` CLI is missing or the daemon cannot be
+/// reached, `baby` proceeds with a warning. Returns `Err` only when the wait
+/// exceeds `timeout_secs`.
+pub fn wait_for_repo_unlock(repo_root: &Path, timeout_secs: u64) -> Result<()> {
+    if !locksmith_available() {
+        log::debug!("locksmith CLI not found; skipping repo unlock wait");
+        return Ok(());
+    }
+
+    let canonical = repo_root
+        .canonicalize()
+        .unwrap_or_else(|_| repo_root.to_path_buf());
+    let repo_str = canonical.to_string_lossy();
+    log::info!("waiting for repo locks on {} to clear", repo_str);
+
+    let deadline = Instant::now() + Duration::from_secs(timeout_secs);
+    loop {
+        match list_active_leases() {
+            Ok(leases) => {
+                let blocking = leases_for_repo(&leases, &repo_str);
+                if blocking.is_empty() {
+                    log::debug!("no active locksmith leases on {}; proceeding", repo_str);
+                    return Ok(());
+                }
+                for lease in &blocking {
+                    log::info!(
+                        "repo still locked by {} on {} ({})",
+                        lease.owner,
+                        lease.resource,
+                        lease.mode
+                    );
+                }
+            }
+            Err(e) => {
+                log::warn!(
+                    "could not list locksmith leases for repo wait; proceeding: {}",
+                    e
+                );
+                return Ok(());
+            }
+        }
+
+        if Instant::now() >= deadline {
+            return Err(BabyError::lock_timeout(format!(
+                "repo {} (timeout: {}s)",
+                repo_str, timeout_secs
+            )));
+        }
+
+        thread::sleep(Duration::from_secs(REPO_UNLOCK_POLL_INTERVAL_SECS));
+    }
+}
+
+/// Minimal representation of a locksmith lease for filtering.
+#[derive(serde::Deserialize)]
+struct LeaseSummary {
+    resource: String,
+    owner: String,
+    mode: String,
+}
+
+/// Fetch all active leases from `locksmithd`.
+fn list_active_leases() -> Result<Vec<LeaseSummary>> {
+    let output = Command::new("locksmith")
+        .arg("leases")
+        .arg("--json")
+        .output()
+        .map_err(|e| BabyError::io("run locksmith leases", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(BabyError::new(
+            crate::error::ErrorKind::LockTimeout,
+            format!("locksmith leases failed: {}", stderr.trim()),
+        ));
+    }
+
+    serde_json::from_slice(&output.stdout).map_err(|e| {
+        BabyError::new(
+            crate::error::ErrorKind::LockTimeout,
+            format!("parse locksmith leases JSON: {}", e),
+        )
+    })
+}
+
+/// Return every lease whose resource names embed `repo_path`.
+fn leases_for_repo<'a>(leases: &'a [LeaseSummary], repo_path: &str) -> Vec<&'a LeaseSummary> {
+    leases
+        .iter()
+        .filter(|l| l.resource.contains(repo_path))
+        .collect()
+}
+
 /// Release a locksmith lease. Used directly by the guard's `Drop` impl.
 fn release(resource: &str) -> Result<()> {
     let status = Command::new("locksmith")
@@ -216,5 +320,49 @@ mod tests {
         let path = Path::new("/definitely/not/a/real/path/for/baby/lock/test");
         let name = resource_name(path, "widget");
         assert_eq!(name, format!("baby:widget@{}", path.display()));
+    }
+
+    #[test]
+    fn leases_for_repo_matches_baby_and_path_style_resources() {
+        let repo = "/home/sal/baby";
+        let leases = vec![
+            LeaseSummary {
+                resource: format!("baby:baby@{repo}"),
+                owner: "sal".into(),
+                mode: "exclusive".into(),
+            },
+            LeaseSummary {
+                resource: format!("{repo}/src/main.rs"),
+                owner: "agent".into(),
+                mode: "shared".into(),
+            },
+            LeaseSummary {
+                resource: "gpu:0".into(),
+                owner: "ci".into(),
+                mode: "exclusive".into(),
+            },
+        ];
+        let blocking = leases_for_repo(&leases, repo);
+        assert_eq!(blocking.len(), 2);
+        assert!(blocking.iter().any(|l| l.resource.starts_with("baby:")));
+        assert!(blocking.iter().any(|l| l.resource.ends_with("src/main.rs")));
+    }
+
+    #[test]
+    fn leases_for_repo_ignores_unrelated_resources() {
+        let repo = "/home/sal/baby";
+        let leases = vec![
+            LeaseSummary {
+                resource: "/home/sal/locksmith/src/lib.rs".into(),
+                owner: "sal".into(),
+                mode: "exclusive".into(),
+            },
+            LeaseSummary {
+                resource: "deploy:prod".into(),
+                owner: "ci".into(),
+                mode: "exclusive".into(),
+            },
+        ];
+        assert!(leases_for_repo(&leases, repo).is_empty());
     }
 }

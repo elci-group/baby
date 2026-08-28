@@ -102,6 +102,8 @@ pub struct InstallConfig {
     pub lock_timeout_secs: u64,
     /// Seconds to request for the locksmith lease duration.
     pub lock_lease_secs: u64,
+    /// Seconds to wait for all repo-wide locksmith leases to clear.
+    pub repo_lock_timeout_secs: u64,
 }
 
 impl Default for InstallConfig {
@@ -121,6 +123,7 @@ impl Default for InstallConfig {
             no_lock: false,
             lock_timeout_secs: crate::lock::DEFAULT_TIMEOUT_SECS,
             lock_lease_secs: crate::lock::DEFAULT_LEASE_SECS,
+            repo_lock_timeout_secs: crate::lock::DEFAULT_TIMEOUT_SECS,
         }
     }
 }
@@ -326,6 +329,11 @@ pub fn build_and_install(config: &InstallConfig) -> Result<()> {
     );
 
     let mut animation = terminal_ui::InstallAnimation::start(&project, !config.dry_run);
+
+    if !config.no_lock && !config.dry_run {
+        install_ticker(animation.as_ref(), "🔓", "waiting for repo locks to clear");
+        lock::wait_for_repo_unlock(&root, config.repo_lock_timeout_secs)?;
+    }
 
     let _lock_guard = if config.no_lock || config.dry_run {
         None

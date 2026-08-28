@@ -232,6 +232,7 @@ fn process_pending(state: &Arc<Mutex<DaemonState>>) -> Result<()> {
             no_lock: false,
             lock_timeout_secs: baby::lock::DEFAULT_TIMEOUT_SECS,
             lock_lease_secs: baby::lock::DEFAULT_LEASE_SECS,
+            repo_lock_timeout_secs: baby::lock::DEFAULT_TIMEOUT_SECS,
             target_dir: None,
             install_dir: Some(cfg.install.clone()),
             recipe: None,
