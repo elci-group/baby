@@ -1292,6 +1292,7 @@ mod tests {
             binary: "widget".into(),
             artifact: PathBuf::from("target/release/widget"),
             commands: vec![vec!["cargo".into(), "build".into(), "--release".into()]],
+            restart_command: None,
         };
         let config = InstallConfig::default();
         let result =
@@ -1308,6 +1309,7 @@ mod tests {
             binary: "widget".into(),
             artifact: PathBuf::from("target/release/widget"),
             commands: vec![vec!["cargo".into(), "build".into(), "--release".into()]],
+            restart_command: None,
         };
         let mut config = InstallConfig {
             no_boar: true,

@@ -31,6 +31,14 @@ pub struct InstallRecipe {
     pub artifact: PathBuf,
     #[serde(default)]
     pub commands: Vec<Vec<String>>,
+    /// Command to run instead of `systemctl restart <binary>.service` after
+    /// a successful install, so a running daemon can hand off gracefully
+    /// (e.g. spawn-and-elect a new leader) rather than be hard-restarted.
+    /// Only used when `--service` is passed. Each argument containing the
+    /// literal token `{binary}` has it replaced with the resolved install
+    /// path before the command runs.
+    #[serde(default)]
+    pub restart_command: Option<Vec<String>>,
 }
 
 impl InstallRecipe {
@@ -87,6 +95,14 @@ impl InstallRecipe {
             return Err(BabyError::new(
                 ErrorKind::RecipeInvalid,
                 "recipe commands must each contain a non-empty executable",
+            ));
+        }
+        if let Some(restart_command) = &self.restart_command
+            && (restart_command.is_empty() || restart_command[0].trim().is_empty())
+        {
+            return Err(BabyError::new(
+                ErrorKind::RecipeInvalid,
+                "recipe restart_command must contain a non-empty executable",
             ));
         }
         if !root.is_dir() {
@@ -166,6 +182,7 @@ impl InstallRecipe {
                 binary.clone(),
             ]],
             binary,
+            restart_command: None,
         })
     }
 }
@@ -224,6 +241,41 @@ mod tests {
             binary: "x".into(),
             artifact: PathBuf::from("../x"),
             commands: vec![vec!["make".into()]],
+            restart_command: None,
+        };
+        assert!(recipe.validate(Path::new(".")).is_err());
+    }
+
+    #[test]
+    fn loads_recipe_with_restart_command() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(".baby.toml");
+        fs::write(
+            &path,
+            "schema = \"baby.install/v1\"\nbuild_system = \"script\"\nbinary = \"widget\"\nartifact = \"out/widget\"\ncommands = [[\"make\"]]\nrestart_command = [\"widget-cli\", \"shark\", \"upgrade\", \"{binary}\"]\n",
+        )
+        .unwrap();
+        let recipe = InstallRecipe::load(&path).unwrap();
+        assert_eq!(
+            recipe.restart_command,
+            Some(vec![
+                "widget-cli".to_string(),
+                "shark".to_string(),
+                "upgrade".to_string(),
+                "{binary}".to_string(),
+            ])
+        );
+    }
+
+    #[test]
+    fn rejects_empty_restart_command() {
+        let recipe = InstallRecipe {
+            schema: RECIPE_SCHEMA.to_string(),
+            build_system: BuildSystem::Script,
+            binary: "x".into(),
+            artifact: PathBuf::from("out/x"),
+            commands: vec![vec!["make".into()]],
+            restart_command: Some(vec![]),
         };
         assert!(recipe.validate(Path::new(".")).is_err());
     }
