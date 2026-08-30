@@ -1,0 +1,22 @@
+[package]
+name = "boar"
+version = "0.7.27"
+edition.workspace = true
+rust-version.workspace = true
+description = "Build On Available RAM: adaptive tmpfs-backed Cargo targets"
+license.workspace = true
+repository.workspace = true
+keywords = ["cargo", "rust", "tmpfs", "build-cache", "ramdisk"]
+categories = ["command-line-utilities", "development-tools::build-utils"]
+
+[dependencies]
+form3 = { workspace = true }
+boar-core = { workspace = true }
+
+[[bin]]
+name = "boar"
+path = "src/main.rs"
+
+[lib]
+name = "boar"
+path = "src/lib.rs"

@@ -32,13 +32,19 @@ You can run everything in one go with:
 
 ## Project structure
 
-- `src/lib.rs` — shared library code: install logic, XDG helpers, PID management.
-- `src/error.rs` — structured `BabyError` type used throughout the crate.
-- `src/logger.rs` — tiny `log` implementation that replaces `env_logger`.
-- `src/config.rs` — `.birth.toml` parsing and project mapping.
-- `src/bin/baby.rs` — `baby` CLI.
-- `src/bin/birthctl.rs` — `birthctl` CLI.
-- `src/bin/birthd.rs` — `birthd` daemon.
+This repository is a Cargo workspace. The main crates are:
+
+- `crates/baby/src/lib.rs` — shared library code: install logic, XDG helpers, PID management.
+- `crates/baby/src/error.rs` — structured `BabyError` type used throughout the crate.
+- `crates/baby/src/logger.rs` — tiny `log` implementation that replaces `env_logger`.
+- `crates/baby/src/config.rs` — `.birth.toml` parsing and project mapping.
+- `crates/baby/src/main.rs` — `baby` CLI.
+- `crates/birthctl/src/main.rs` — `birthctl` CLI.
+- `crates/birthd/src/main.rs` — `birthd` daemon.
+- `crates/boaring/` — deterministic content-addressed computation-reuse substrate.
+- `crates/boarish/` — Cargo-specific compilation cache built on `boaring`.
+- `crates/boar/` — RAM-aware Cargo target placement.
+- `crates/boar-core/` — shared identity, protocol, and capability types.
 - `tests/cli.rs` — integration tests for the three binaries.
 - `man/` — generated man pages.
 

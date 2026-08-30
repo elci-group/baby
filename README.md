@@ -7,10 +7,12 @@ build it, and install the resulting binary with one command.
 
 ## Install
 
-From source with a working Rust toolchain:
+This repository is a Cargo workspace. From source with a working Rust toolchain:
 
 ```bash
-cargo install --path .
+cargo install --path crates/baby
+cargo install --path crates/birthd
+cargo install --path crates/birthctl
 ```
 
 This installs three binaries:
@@ -18,6 +20,9 @@ This installs three binaries:
 - `baby` — one-shot build and install.
 - `birthd` — filesystem watcher daemon that rebuilds on change.
 - `birthctl` — control utility for `birthd`.
+
+The workspace also contains the `boar`, `boarish`, and `boaring` crates under
+`crates/`, which can be installed the same way.
 
 ## Quick start
 

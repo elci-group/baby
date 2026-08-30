@@ -1,0 +1,291 @@
+// Copyright (c) 2026 sal
+// SPDX-License-Identifier: MIT
+
+//! A tiny `log` implementation that replaces `env_logger`.
+//!
+//! `setup_logging` targets stderr; `setup_daemon_logging` writes to stderr and
+//! the birthd log file. The default level is `info`; override with `RUST_LOG`
+//! (`error`, `warn`, `info`, `debug`, `trace`).
+
+use std::fs::{File, OpenOptions};
+use std::io::{self, Write};
+use std::sync::Mutex;
+use std::time::SystemTime;
+
+use log::{LevelFilter, Log, Metadata, Record};
+
+use crate::error::{BabyError, Result};
+
+/// Tracks how many lines of animated, in-place terminal output (the install
+/// baby's art block) currently sit at the cursor. Any log line must erase
+/// those lines first so a plain `log::info!` from a build thread can never
+/// land mid-frame and corrupt the animation (or vice versa) — without this,
+/// a background redraw and a log write racing for the same terminal lines
+/// is exactly what made prior install runs look garbled/stuck.
+pub(crate) struct RenderState {
+    pub(crate) drawn_lines: usize,
+}
+
+pub(crate) static RENDER: Mutex<RenderState> = Mutex::new(RenderState { drawn_lines: 0 });
+
+/// Replace a previously drawn terminal block in one write.
+///
+/// Building the complete cursor movement, erasure, and replacement before
+/// touching the terminal prevents observers from seeing a half-cleared frame.
+/// Explicit carriage returns also make replacement independent of the cursor
+/// column left behind by another terminal writer.
+pub(crate) fn replace_drawn(out: &mut impl Write, lines: usize, replacement: &str) {
+    let mut update = String::with_capacity(replacement.len() + lines.saturating_mul(12));
+    if lines > 0 {
+        use std::fmt::Write as _;
+
+        update.push('\r');
+        let _ = write!(update, "\x1b[{lines}A");
+        for line in 0..lines {
+            update.push_str("\x1b[2K");
+            if line + 1 < lines {
+                update.push_str("\x1b[1B\r");
+            }
+        }
+        if lines > 1 {
+            let _ = write!(update, "\x1b[{}A", lines - 1);
+        }
+        update.push('\r');
+    }
+    update.push_str(replacement);
+    let _ = out.write_all(update.as_bytes());
+}
+
+/// Erase a previously drawn block while retaining the replacement invariant.
+pub(crate) fn erase_drawn(out: &mut impl Write, lines: usize) {
+    replace_drawn(out, lines, "");
+}
+
+struct SimpleLogger {
+    max_level: LevelFilter,
+    file: Option<Mutex<File>>,
+}
+
+impl Log for SimpleLogger {
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        metadata.level() <= self.max_level
+    }
+
+    fn log(&self, record: &Record) {
+        if !self.enabled(record.metadata()) {
+            return;
+        }
+
+        let timestamp = format_timestamp(SystemTime::now());
+        let line = format!("{} {:>5} {}\n", timestamp, record.level(), record.args());
+
+        {
+            let mut render = RENDER.lock().unwrap_or_else(|e| e.into_inner());
+            let mut stderr = io::stderr();
+            replace_drawn(&mut stderr, render.drawn_lines, &line);
+            render.drawn_lines = 0;
+        }
+
+        if let Some(ref file) = self.file
+            && let Ok(mut file) = file.lock()
+        {
+            let _ = file.write_all(line.as_bytes());
+        }
+    }
+
+    fn flush(&self) {
+        let _ = io::stderr().flush();
+        if let Some(ref file) = self.file
+            && let Ok(mut file) = file.lock()
+        {
+            let _ = file.flush();
+        }
+    }
+}
+
+/// Format a [`SystemTime`] as `YYYY-MM-DDTHH:MM:SSZ` in UTC using only `std`.
+fn format_timestamp(st: SystemTime) -> String {
+    let duration = st
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default();
+    let secs = duration.as_secs();
+    let (year, month, day, hour, minute, second) = secs_to_utc(secs);
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+        year, month, day, hour, minute, second
+    )
+}
+
+fn is_leap_year(year: u32) -> bool {
+    year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+}
+
+fn secs_to_utc(mut secs: u64) -> (u32, u32, u32, u32, u32, u32) {
+    let ss = secs % 60;
+    secs /= 60;
+    let mm = secs % 60;
+    let hh = (secs / 60) % 24;
+    let mut days = secs / 60 / 24;
+
+    let mut year = 1970u32;
+    loop {
+        let days_in_year = if is_leap_year(year) { 366 } else { 365 };
+        if days < days_in_year as u64 {
+            break;
+        }
+        days -= days_in_year as u64;
+        year += 1;
+    }
+
+    let days_in_month: [u32; 12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let mut month = 1u32;
+    loop {
+        let dim = if month == 2 && is_leap_year(year) {
+            29
+        } else {
+            days_in_month[(month - 1) as usize]
+        };
+        if days < dim as u64 {
+            break;
+        }
+        days -= dim as u64;
+        month += 1;
+    }
+
+    (
+        year,
+        month,
+        (days + 1) as u32,
+        hh as u32,
+        mm as u32,
+        ss as u32,
+    )
+}
+
+fn parse_level() -> LevelFilter {
+    match std::env::var("RUST_LOG").as_deref() {
+        Ok("error") => LevelFilter::Error,
+        Ok("warn") => LevelFilter::Warn,
+        Ok("debug") => LevelFilter::Debug,
+        Ok("trace") => LevelFilter::Trace,
+        _ => LevelFilter::Info,
+    }
+}
+
+/// Initialise logging to stderr.
+pub fn setup_logging() {
+    let logger = SimpleLogger {
+        max_level: parse_level(),
+        file: None,
+    };
+    let _ = log::set_boxed_logger(Box::new(logger));
+    log::set_max_level(parse_level());
+}
+
+/// Initialise logging to stderr and the birthd log file.
+pub fn setup_daemon_logging(log_path: &std::path::Path) -> Result<()> {
+    if let Some(parent) = log_path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| BabyError::io(format!("create log directory {}", parent.display()), e))?;
+    }
+
+    let file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_path)
+        .map_err(|e| BabyError::io(format!("open log file {}", log_path.display()), e))?;
+
+    let logger = SimpleLogger {
+        max_level: parse_level(),
+        file: Some(Mutex::new(file)),
+    };
+    let _ = log::set_boxed_logger(Box::new(logger));
+    log::set_max_level(parse_level());
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use log::Level;
+
+    #[derive(Default)]
+    struct RecordingWriter {
+        bytes: Vec<u8>,
+        writes: usize,
+    }
+
+    impl Write for RecordingWriter {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            self.writes += 1;
+            self.bytes.extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn replacement_is_emitted_as_one_atomic_write() {
+        let mut out = RecordingWriter::default();
+        replace_drawn(&mut out, 3, "replacement\n");
+
+        assert_eq!(out.writes, 1);
+        assert_eq!(
+            String::from_utf8(out.bytes).unwrap(),
+            "\r\x1b[3A\x1b[2K\x1b[1B\r\x1b[2K\x1b[1B\r\x1b[2K\x1b[2A\rreplacement\n"
+        );
+    }
+
+    #[test]
+    fn replacement_without_a_previous_block_has_no_cursor_codes() {
+        let mut out = RecordingWriter::default();
+        replace_drawn(&mut out, 0, "plain\n");
+
+        assert_eq!(out.writes, 1);
+        assert_eq!(out.bytes, b"plain\n");
+    }
+
+    #[test]
+    fn parse_level_defaults_to_info() {
+        // This test assumes RUST_LOG is not set in the test environment.
+        let level = parse_level();
+        assert!(level >= LevelFilter::Info);
+    }
+
+    #[test]
+    fn log_line_contains_level() {
+        let logger = SimpleLogger {
+            max_level: LevelFilter::Info,
+            file: None,
+        };
+        let metadata = log::MetadataBuilder::new()
+            .level(Level::Info)
+            .target("test")
+            .build();
+        assert!(logger.enabled(&metadata));
+
+        let metadata = log::MetadataBuilder::new()
+            .level(Level::Debug)
+            .target("test")
+            .build();
+        assert!(!logger.enabled(&metadata));
+    }
+
+    #[test]
+    fn format_unix_epoch() {
+        assert_eq!(
+            format_timestamp(SystemTime::UNIX_EPOCH),
+            "1970-01-01T00:00:00Z"
+        );
+    }
+
+    #[test]
+    fn format_known_datetime() {
+        // 2024-03-15 12:30:45 UTC = 1710505845 seconds since epoch.
+        let st = SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_710_505_845);
+        assert_eq!(format_timestamp(st), "2024-03-15T12:30:45Z");
+    }
+}

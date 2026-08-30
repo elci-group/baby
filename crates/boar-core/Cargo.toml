@@ -1,0 +1,15 @@
+[package]
+name = "boar-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Shared identity, protocol, and capability types for the Baby/Boar/Boarish ecosystem."
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true, optional = true }
+
+[features]
+default = ["serde"]
+serde = ["dep:serde"]

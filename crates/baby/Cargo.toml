@@ -1,0 +1,40 @@
+[package]
+name = "baby"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Build projects from validated installation recipes and install their declared binaries."
+license.workspace = true
+repository.workspace = true
+keywords = ["installer", "build", "cli", "automation", "recipes"]
+
+[dependencies]
+clap = { workspace = true }
+notify = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+signal-hook = { workspace = true }
+libc = { workspace = true }
+log = { workspace = true }
+clap_mangen = { workspace = true }
+anstyle = { workspace = true }
+tokio = { workspace = true }
+rayon = { workspace = true }
+chrono = { workspace = true }
+num_cpus = { workspace = true }
+tempfile = { workspace = true }
+form3 = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+assert_cmd = { workspace = true }
+predicates = { workspace = true }
+
+[[bin]]
+name = "baby"
+path = "src/main.rs"
+
+[lib]
+name = "baby"
+path = "src/lib.rs"

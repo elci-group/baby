@@ -1,0 +1,13 @@
+[package]
+name = "boaring"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Deterministic persistent computation-reuse substrate."
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+boar-core = { workspace = true }
+
+[dev-dependencies]

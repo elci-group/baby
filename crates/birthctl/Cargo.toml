@@ -1,0 +1,20 @@
+[package]
+name = "birthctl"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Control utility for the birthd build daemon."
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+baby = { workspace = true }
+clap = { workspace = true }
+libc = { workspace = true }
+log = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
+
+[[bin]]
+name = "birthctl"
+path = "src/main.rs"

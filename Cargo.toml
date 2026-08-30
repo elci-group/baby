@@ -1,13 +1,24 @@
-[package]
-name = "baby"
+[workspace]
+members = [
+    "crates/baby",
+    "crates/birthd",
+    "crates/birthctl",
+    "crates/boaring",
+    "crates/boarish",
+    "crates/boar",
+    "crates/boar-core",
+    "crates/boar-index",
+]
+resolver = "3"
+
+[workspace.package]
 version = "0.10.6"
 edition = "2024"
-description = "Build projects from validated installation recipes and install their declared binaries."
+rust-version = "1.85"
 license = "MIT"
 repository = "https://github.com/elci-group/baby"
-keywords = ["installer", "build", "cli", "automation", "recipes"]
 
-[dependencies]
+[workspace.dependencies]
 clap = { version = "4", features = ["derive"] }
 notify = { version = "7", default-features = false, features = ["macos_fsevent"] }
 serde = { version = "1", features = ["derive"] }
@@ -23,12 +34,20 @@ rayon = "1.8"
 chrono = "0.4"
 num_cpus = "1"
 tempfile = "3"
-form3 = { path = "../3form" }
-
-[dev-dependencies]
-tempfile = "3"
 assert_cmd = "2"
 predicates = "3"
+rusqlite = { version = "0.34", features = ["bundled"] }
+criterion = { version = "0.5", features = ["html_reports"] }
+form3 = { path = "../3form" }
+
+# workspace members
+baby = { path = "crates/baby" }
+boaring = { path = "crates/boaring" }
+boarish = { path = "crates/boarish" }
+boar = { path = "crates/boar" }
+boar-core = { path = "crates/boar-core" }
+boar-index = { path = "crates/boar-index" }
 
 [profile.release]
 strip = false
+lto = "thin"

@@ -1,0 +1,24 @@
+[package]
+name = "boar-index"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Local artifact index for the Baby/Boar/Boarish ecosystem."
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+boar-core = { workspace = true }
+boaring = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
+rusqlite = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+criterion = { workspace = true }
+
+[[bench]]
+name = "index_benchmark"
+harness = false

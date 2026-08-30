@@ -1,0 +1,20 @@
+[package]
+name = "boarish"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Rust/Cargo compilation cache built on Boaring."
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+boaring = { workspace = true }
+boar-core = { workspace = true }
+
+[[bin]]
+name = "boarish"
+path = "src/main.rs"
+
+[lib]
+name = "boarish"
+path = "src/lib.rs"

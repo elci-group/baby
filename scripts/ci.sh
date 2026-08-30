@@ -7,13 +7,13 @@ echo "==> cargo fmt --check"
 cargo fmt --all -- --check
 
 echo "==> cargo clippy"
-cargo clippy --all-targets -- -D warnings
+cargo clippy --workspace --all-targets -- -D warnings
 
 echo "==> cargo test"
-cargo test --all-targets
+cargo test --workspace --all-targets
 
 echo "==> cargo doc"
-RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
+RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
 
 echo "==> cargo audit"
 cargo audit
