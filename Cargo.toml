@@ -38,10 +38,13 @@ assert_cmd = "2"
 predicates = "3"
 rusqlite = { version = "0.34", features = ["bundled"] }
 criterion = { version = "0.5", features = ["html_reports"] }
+escargot = "0.5"
 form3 = { path = "../3form" }
 
 # workspace members
 baby = { path = "crates/baby" }
+birthctl = { path = "crates/birthctl" }
+birthd = { path = "crates/birthd" }
 boaring = { path = "crates/boaring" }
 boarish = { path = "crates/boarish" }
 boar = { path = "crates/boar" }

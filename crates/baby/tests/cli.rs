@@ -4,10 +4,32 @@
 use assert_cmd::Command;
 use predicates::prelude::*;
 use std::fs;
+use std::path::PathBuf;
+use std::sync::OnceLock;
+
+fn bin_command(name: &str) -> Command {
+    static CACHE: OnceLock<std::collections::HashMap<String, PathBuf>> = OnceLock::new();
+    let map = CACHE.get_or_init(|| {
+        let manifest = concat!(env!("CARGO_MANIFEST_DIR"), "/../../Cargo.toml");
+        ["baby", "birthctl", "birthd"]
+            .into_iter()
+            .map(|n| {
+                let cargo = escargot::CargoBuild::new()
+                    .manifest_path(manifest)
+                    .bin(n)
+                    .run()
+                    .unwrap_or_else(|e| panic!("failed to build {n}: {e}"));
+                (n.to_string(), cargo.path().to_path_buf())
+            })
+            .collect()
+    });
+    let path = map.get(name).unwrap_or_else(|| panic!("unknown binary: {name}"));
+    Command::from_std(std::process::Command::new(path))
+}
 
 #[test]
 fn baby_help_shows_usage() {
-    let mut cmd = Command::cargo_bin("baby").unwrap();
+    let mut cmd = bin_command("baby");
     cmd.arg("--help");
     cmd.assert()
         .success()
@@ -16,7 +38,7 @@ fn baby_help_shows_usage() {
 
 #[test]
 fn baby_help_documents_post_install_cleanup_override() {
-    let mut cmd = Command::cargo_bin("baby").unwrap();
+    let mut cmd = bin_command("baby");
     cmd.arg("--help");
     cmd.assert()
         .success()
@@ -25,7 +47,7 @@ fn baby_help_documents_post_install_cleanup_override() {
 
 #[test]
 fn baby_help_documents_locksmith_flags() {
-    let mut cmd = Command::cargo_bin("baby").unwrap();
+    let mut cmd = bin_command("baby");
     cmd.arg("--help");
     cmd.assert()
         .success()
@@ -37,7 +59,7 @@ fn baby_help_documents_locksmith_flags() {
 
 #[test]
 fn baby_version_prints_semver() {
-    let mut cmd = Command::cargo_bin("baby").unwrap();
+    let mut cmd = bin_command("baby");
     cmd.arg("--version");
     cmd.assert()
         .success()
@@ -59,7 +81,7 @@ edition = "2021"
     )
     .unwrap();
 
-    let mut cmd = Command::cargo_bin("baby").unwrap();
+    let mut cmd = bin_command("baby");
     cmd.current_dir(&project_dir).arg("--dry-run").arg("--user");
     cmd.assert()
         .success()
@@ -69,7 +91,7 @@ edition = "2021"
 
 #[test]
 fn birthctl_help_shows_usage() {
-    let mut cmd = Command::cargo_bin("birthctl").unwrap();
+    let mut cmd = bin_command("birthctl");
     cmd.arg("--help");
     cmd.assert()
         .success()
@@ -78,7 +100,7 @@ fn birthctl_help_shows_usage() {
 
 #[test]
 fn birthctl_status_when_not_running() {
-    let mut cmd = Command::cargo_bin("birthctl").unwrap();
+    let mut cmd = bin_command("birthctl");
     cmd.arg("status");
     // Should succeed even when daemon is not running.
     cmd.assert()
@@ -88,7 +110,7 @@ fn birthctl_status_when_not_running() {
 
 #[test]
 fn birthctl_reload_when_not_running_fails() {
-    let mut cmd = Command::cargo_bin("birthctl").unwrap();
+    let mut cmd = bin_command("birthctl");
     cmd.arg("reload");
     cmd.assert()
         .failure()
@@ -97,7 +119,7 @@ fn birthctl_reload_when_not_running_fails() {
 
 #[test]
 fn birthctl_stop_when_not_running_fails() {
-    let mut cmd = Command::cargo_bin("birthctl").unwrap();
+    let mut cmd = bin_command("birthctl");
     cmd.arg("stop");
     cmd.assert()
         .failure()
@@ -107,7 +129,7 @@ fn birthctl_stop_when_not_running_fails() {
 #[test]
 fn birthctl_watch_creates_config() {
     let dir = tempfile::tempdir().unwrap();
-    let mut cmd = Command::cargo_bin("birthctl").unwrap();
+    let mut cmd = bin_command("birthctl");
     cmd.current_dir(&dir)
         .arg("watch")
         .arg("--project")
@@ -130,7 +152,7 @@ fn birthctl_watch_creates_config() {
 #[test]
 fn birthctl_watch_requires_path() {
     let dir = tempfile::tempdir().unwrap();
-    let mut cmd = Command::cargo_bin("birthctl").unwrap();
+    let mut cmd = bin_command("birthctl");
     cmd.current_dir(&dir)
         .arg("watch")
         .arg("--project")
@@ -142,7 +164,7 @@ fn birthctl_watch_requires_path() {
 
 #[test]
 fn birthd_help_shows_usage() {
-    let mut cmd = Command::cargo_bin("birthd").unwrap();
+    let mut cmd = bin_command("birthd");
     cmd.arg("--help");
     cmd.assert()
         .success()
@@ -153,7 +175,7 @@ fn birthd_help_shows_usage() {
 fn birthd_generate_man() {
     let dir = tempfile::tempdir().unwrap();
     let man_path = dir.path().join("birthd.1");
-    let mut cmd = Command::cargo_bin("birthd").unwrap();
+    let mut cmd = bin_command("birthd");
     cmd.arg("--generate-man").arg(&man_path);
     cmd.assert().success();
     assert!(man_path.exists());
