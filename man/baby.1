@@ -1,6 +1,6 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
-.TH baby 1  "baby 0.10.5" 
+.TH baby 1  "baby 0.10.6" 
 .SH NAME
 baby \- Build a project from a recipe and install its binary
 .SH SYNOPSIS
@@ -87,15 +87,44 @@ Print version
 .TP
 [\fIRUN_ARGS\fR]
 Pass additional arguments when running with \-\-run
-.SH SUBCOMMANDS
+.SH COMMANDS
 .TP
-baby\-update(1)
-Check for available updates
+\fBbaby update\fR [\fB\-\-stable\fR|\fB\-\-nightly\fR|\fB\-\-bleeding\fR]
+Check for available updates. Exactly one channel may be given;
+\-\-stable is the default.
 .TP
-baby\-boom(1)
-Discover and update all managed tools in parallel
+\fBbaby boom\fR [\fB\-\-init\fR] [\fB\-\-dry\-run\fR] [\fB\-\-yes\fR] [\fB\-\-interactive\fR] [\fB\-\-parallelism\fR \fIN\fR] [\fB\-\-filter\fR \fILIST\fR]
+Discover and update all managed tools in parallel. \-\-init writes a new
+.boom.toml instead of updating. \-\-filter takes a comma\-separated list of
+tool names.
+.SH EXIT STATUS
 .TP
-baby\-help(1)
-Print this message or the help of the given subcommand(s)
+0
+Success: the project was built and installed (or the requested check,
+update, or boom run completed without errors).
+.TP
+1
+Failure: recipe validation, build, install, lock acquisition, or the
+command run failed.
+.SH FILES
+.TP
+.I .baby.toml
+Versioned installation recipe in the project root (preferred).
+.TP
+.I Cargo.toml
+Fallback recipe source when no .baby.toml exists.
+.TP
+.I .boom.toml
+Managed-tools list used by \fBbaby boom\fR (\-\-init creates it).
+.TP
+.I /usr/local/bin
+Default installation directory (override with \-\-user or \-\-install\-dir).
+.TP
+.I ~/.local/bin
+Per\-user installation directory (used with \-\-user).
+.SH SEE ALSO
+.BR birthctl (1),
+.BR birthd (1),
+.BR boar (1)
 .SH VERSION
-v0.10.5
+v0.10.6

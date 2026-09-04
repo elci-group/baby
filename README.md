@@ -24,6 +24,12 @@ This installs three binaries:
 The workspace also contains the `boar`, `boarish`, and `boaring` crates under
 `crates/`, which can be installed the same way.
 
+### Man pages
+
+Groff man pages for the command-line tools live in `man/` (`baby.1`,
+`birthctl.1`, `birthd.1`, `boar.1`). View one directly with
+`man -l man/baby.1`, or install them with `install -m 644 man/*.1 /usr/local/share/man/man1/`.
+
 ## Quick start
 
 Build and install the current project to `/usr/local/bin`:

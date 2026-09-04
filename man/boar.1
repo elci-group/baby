@@ -1,0 +1,146 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH boar 1  "boar 0.7.27" 
+.SH NAME
+boar \- Build On Available RAM: RAM\-aware Cargo wrapper
+.SH SYNOPSIS
+\fBboar\fR [\fIOPTIONS\fR] \fICOMMAND\fR [\fICARGO ARGS\fR...]
+.PP
+\fBboar\fR [\fIOPTIONS\fR] \fBcargo\fR \fICARGO\-COMMAND\fR [\fICARGO ARGS\fR...]
+.SH DESCRIPTION
+.PP
+BOAR — Build On Available RAM
+.PP
+boar is a RAM\-aware Cargo wrapper for Linux. It places a project's
+Cargo target directory on tmpfs when the machine has enough safe
+headroom, and falls back to disk when it does not. Memory pressure
+(PSI) and live swap activity are checked before each automatic
+placement; when pressure is elevated, builds run on disk even in
+\fBauto\fR mode.
+.PP
+boar requires Linux. Each project's RAM target lives under the RAM root
+(default /dev/shm/boar) and is marked with a .boar-owner file so that
+\fBboar clean\fR only removes boar\-managed directories.
+.SH COMMANDS
+.TP
+\fBboar build\fR, \fBcheck\fR, \fBtest\fR, \fBrun\fR, \fBbench\fR, \fBclippy\fR, \fBdoc\fR
+Run the corresponding Cargo subcommand through BOAR, with the target
+directory placed on RAM or disk per the active mode.
+Example: \fBboar build \-\-release\fR
+.TP
+\fBboar cargo\fR \fICARGO\-COMMAND\fR [\fIARGS\fR...]
+Run any Cargo subcommand through BOAR.
+Example: \fBboar cargo metadata \-\-no\-deps\fR
+.TP
+\fBboar status\fR
+Show memory capacity, pressure (PSI), RAM root usage, and active
+RAM\-backed targets with their owners and sizes.
+.TP
+\fBboar clean\fR [\fB\-\-all\fR]
+Without \-\-all, remove the current project's RAM target. With \-\-all,
+remove every BOAR\-owned RAM target.
+.TP
+\fBboar doctor\fR
+Check Linux, Cargo, memory, pressure, and tmpfs readiness, and report
+any condition that would force disk builds.
+.TP
+\fBboar init\fR
+Create a documented .boar.toml in the current workspace. Fails if the
+file already exists.
+.TP
+\fBboar help\fR
+Show the built\-in help message and exit.
+.SH OPTIONS
+.TP
+\fB\-\-mode\fR \fIauto|ram|disk\fR
+Placement mode. Default: \fIauto\fR. Env: \fBBOAR_MODE\fR
+.TP
+\fB\-\-reserve\-mib\fR \fIMIB\fR
+Minimum RAM to leave for the OS. Default: adaptive (25% of RAM, 2 GiB
+floor). Env: \fBBOAR_RESERVE_MIB\fR
+.TP
+\fB\-\-max\-ram\-mib\fR \fIMIB\fR
+Cap the RAM BOAR may use for the target. Default: unlimited.
+Env: \fBBOAR_MAX_RAM_MIB\fR
+.TP
+\fB\-\-ram\-root\fR \fIPATH\fR
+Directory for RAM\-backed targets. Default: /dev/shm/boar.
+Env: \fBBOAR_RAM_ROOT\fR
+.TP
+\fB\-\-disk\-target\fR \fIPATH\fR
+Disk fallback target directory. Default: the workspace's \fItarget\fR/.
+Env: \fBBOAR_DISK_TARGET\fR
+.TP
+\fB\-\-monitor\fR, \fB\-\-no\-monitor\fR
+Enable or disable the live pressure monitor (default: enabled).
+Env: \fBBOAR_MONITOR\fR
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Show the help message and exit.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Show version information and exit.
+.SH CONFIGURATION
+.PP
+Settings are resolved with the precedence: CLI options, then environment
+variables, then .boar.toml, then built\-in defaults. Run \fBboar init\fR
+to create a documented configuration file. A typical .boar.toml:
+.PP
+.RS
+.nf
+mode = "auto"
+# reserve_mib = 2048
+# max_ram_mib = 8192
+ram_root = "/dev/shm/boar"
+disk_target = "target"
+monitor = true
+.fi
+.RE
+.PP
+Unknown keys in .boar.toml are rejected.
+.SH FILES
+.TP
+.I .boar.toml
+Per\-project BOAR settings in the workspace root.
+.TP
+.I /dev/shm/boar/
+Default RAM root. Each project target is a subdirectory tagged with a
+\&.boar\-owner marker file.
+.TP
+.I $XDG_CACHE_HOME/boar/estimates/
+Persisted per\-project target\-size estimates used for placement
+decisions (fallback: ~/.cache/boar/estimates/).
+.SH ENVIRONMENT
+.TP
+\fBBOAR_MODE\fR, \fBBOAR_RESERVE_MIB\fR, \fBBOAR_MAX_RAM_MIB\fR, \fBBOAR_RAM_ROOT\fR, \fBBOAR_DISK_TARGET\fR, \fBBOAR_MONITOR\fR
+Override the corresponding settings (see OPTIONS).
+.TP
+\fBXDG_CACHE_HOME\fR
+Locate the estimate cache.
+.SH EXIT STATUS
+.TP
+0
+Success. For cargo subcommands, the exit status of the cargo process.
+.TP
+2
+Usage or runtime error (unknown option or command, invalid mode,
+missing cargo, non\-Linux platform).
+.SH EXAMPLES
+.TP
+boar build \-\-release
+Build on RAM (or disk under pressure) with release profile.
+.TP
+boar \-\-mode=disk test \-\-workspace
+Force disk placement and run the workspace tests.
+.TP
+boar status
+Inspect memory headroom and RAM targets.
+.TP
+boar clean \-\-all
+Reclaim every BOAR\-owned RAM target.
+.SH SEE ALSO
+.BR baby (1),
+.BR birthd (1),
+.BR cargo (1)
+.SH VERSION
+v0.7.27

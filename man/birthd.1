@@ -1,6 +1,6 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
-.TH birthd 1  "birthd 0.2.11" 
+.TH birthd 1  "birthd 0.10.6" 
 .SH NAME
 birthd \- Build daemon that watches and rebuilds Rust projects
 .SH SYNOPSIS
@@ -12,13 +12,47 @@ birthd — build daemon that watches Rust projects and rebuilds on change
 birthd scans for .birth.toml files, sets up filesystem watchers, and
 automatically rebuilds and reinstalls binaries when source files change.
 .PP
-It stores its PID in $XDG_RUNTIME_DIR/birthd.pid (or /tmp/birthd.pid) and
-writes logs to $XDG_STATE_HOME/birthd.log (or ~/.local/state/birthd.log).
+When a watched path emits a create, modify, or remove event, the owning
+project is queued and rebuilt once its configured debounce window
+(default 500 ms) has elapsed with no further events. The default build
+is \fBcargo build \-\-release\fR through
+.BR baby 's
+build_and_install pipeline (including boar RAM delegation and locksmithd
+coordination); a custom build command from the config file runs instead
+when one is set. After a successful build the configured systemd service,
+if any, is restarted (via sudo when the config requests it).
 .PP
-Signals:
-  SIGHUP   — reload configuration
-  SIGTERM  — graceful shutdown
-  SIGINT   — graceful shutdown
+birthd is a foreground daemon: it does not fork. It writes its PID file
+on startup and removes it on graceful shutdown.
+.SH SIGNALS
+.TP
+\fBSIGTERM\fR
+Graceful shutdown: finish the current loop iteration, remove the PID
+file, and exit.
+.TP
+\fBSIGINT\fR
+Graceful shutdown, as for SIGTERM.
+.SH CONFIGURATION
+.PP
+birthd is configured by .birth.toml files. The current directory's
+.birth.toml is loaded first, then every *.toml file in the user and
+system config directories (see FILES). Unparseable files are skipped
+with a warning. Each file describes one project:
+.PP
+.RS
+.nf
+project = "mytool"            # binary name (required)
+watch = ["src", "Cargo.toml"] # paths to watch (relative to the config file)
+build = "cargo build --release"  # default
+install = "/usr/local/bin"    # install directory (default /usr/local/bin)
+restart = "mytool.service"    # optional systemd unit to restart
+debounce_ms = 500             # default 500
+strip = false                 # strip symbols before installing
+backup = false                # back up the existing binary
+sudo = false                  # use sudo for install/restart
+user = false                  # install to ~/.local/bin instead
+.fi
+.RE
 .SH OPTIONS
 .TP
 \fB\-h\fR, \fB\-\-help\fR
@@ -26,5 +60,39 @@ Print help (see a summary with \*(Aq\-h\*(Aq)
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 Print version
+.SH FILES
+.TP
+.I .birth.toml
+Project configuration in the current working directory.
+.TP
+.I ~/.config/birth.d/*.toml
+User\-level project configurations ($XDG_CONFIG_HOME/birth.d if set).
+.TP
+.I /etc/birth.d/*.toml
+System\-level project configurations.
+.TP
+.I $XDG_RUNTIME_DIR/birthd.pid
+Daemon PID file (fallback: /tmp/birthd.pid).
+.TP
+.I $XDG_STATE_HOME/birthd.log
+Daemon log file (fallback: ~/.local/state/birthd.log, then /tmp).
+.SH ENVIRONMENT
+.TP
+\fBXDG_RUNTIME_DIR\fR, \fBXDG_STATE_HOME\fR, \fBXDG_CONFIG_HOME\fR
+Locate the PID file, log file, and user config directory.
+.TP
+\fBRUST_LOG\fR
+Log filter for the log file (default: info).
+.SH EXIT STATUS
+.TP
+0
+Clean shutdown.
+.TP
+1
+Startup failure (e.g. logging or PID file setup failed).
+.SH SEE ALSO
+.BR baby (1),
+.BR birthctl (1),
+.BR boar (1)
 .SH VERSION
-v0.2.11
+v0.10.6
